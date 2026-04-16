@@ -2,7 +2,7 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const API_URL = 'https://your-backend-domain.com'; // ← замени на адрес своего сервера
+const API_URL = 'https://71fcf767b9fba19b-45-150-66-4.serveousercontent.com';
 
 let currentUser = null;
 
