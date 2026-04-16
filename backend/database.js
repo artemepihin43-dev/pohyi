@@ -2,7 +2,10 @@ const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const path = require('path');
 
-const adapter = new FileSync(path.join(__dirname, 'db.json'));
+// На облаке (Railway/Render) ставь DATA_DIR=/data для persistent volume
+// Локально пишет в backend/db.json как раньше
+const dataDir = process.env.DATA_DIR || __dirname;
+const adapter = new FileSync(path.join(dataDir, 'db.json'));
 const db = low(adapter);
 
 db.defaults({
@@ -14,7 +17,8 @@ db.defaults({
   vpn_keys:  [],
   orders:    [],
   users:     [],
-  referrals: []
+  referrals: [],
+  logs:      []
 }).write();
 
 module.exports = db;

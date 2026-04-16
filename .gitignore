@@ -3,3 +3,4 @@ backend/vpn_keys.db
 node_modules/
 backend/node_modules/
 db.json
+backend/db.json

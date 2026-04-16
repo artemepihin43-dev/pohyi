@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XYLIVPN Admin</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0d0d0f;
+    --surface: #161618;
+    --surface2: #1e1e21;
+    --border: #2a2a2e;
+    --accent: #6c63ff;
+    --accent2: #00d4ff;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e8e8f0;
+    --muted: #6b6b7a;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* LOGIN */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; flex-direction: column; gap: 24px;
+  }
+  .login-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 40px; width: 340px;
+  }
+  .login-box h1 { font-size: 22px; margin-bottom: 8px; }
+  .login-box p { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .login-box input {
+    width: 100%; padding: 12px 14px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-size: 14px; margin-bottom: 12px;
+    outline: none;
+  }
+  .login-box input:focus { border-color: var(--accent); }
+  .btn {
+    padding: 10px 20px; border-radius: 10px; border: none;
+    cursor: pointer; font-size: 14px; font-weight: 600;
+    transition: opacity .2s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-success { background: var(--green); color: #fff; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-full { width: 100%; }
+  .err-msg { color: var(--red); font-size: 13px; text-align: center; display: none; }
+
+  /* LAYOUT */
+  #app { display: none; }
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+    background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 24px 0;
+  }
+  .sidebar-logo {
+    padding: 0 20px 24px; border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .sidebar-logo span { font-size: 18px; font-weight: 700; }
+  .sidebar-logo span b { color: var(--accent); }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px; cursor: pointer; color: var(--muted);
+    font-size: 14px; transition: all .15s; border-left: 3px solid transparent;
+  }
+  .nav-item:hover { color: var(--text); background: var(--surface2); }
+  .nav-item.active { color: var(--text); border-left-color: var(--accent); background: var(--surface2); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-footer { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+  .sidebar-footer button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; }
+  .sidebar-footer button:hover { color: var(--red); }
+
+  .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-title { font-size: 24px; font-weight: 700; margin-bottom: 24px; }
+
+  /* CARDS */
+  .cards-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px;
+  }
+  .card-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .card-value { font-size: 28px; font-weight: 700; }
+  .card-value.green { color: var(--green); }
+  .card-value.accent { color: var(--accent); }
+  .card-value.cyan { color: var(--accent2); }
+  .card-value.yellow { color: var(--yellow); }
+
+  /* TABLES */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .table-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .table-header h3 { font-size: 15px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 16px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .badge {
+    display: inline-block; padding: 3px 9px; border-radius: 99px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge-green { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge-red { background: rgba(239,68,68,.15); color: var(--red); }
+  .badge-yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .badge-blue { background: rgba(108,99,255,.15); color: var(--accent); }
+  .badge-cyan { background: rgba(0,212,255,.15); color: var(--accent2); }
+
+  code {
+    background: var(--bg); padding: 2px 8px; border-radius: 6px;
+    font-family: monospace; font-size: 12px; color: var(--accent2);
+  }
+
+  /* FORMS */
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 10px 12px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-size: 14px; outline: none; font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--accent);
+  }
+  .form-group textarea { resize: vertical; min-height: 100px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; width: 480px; max-width: 95vw;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 18px; margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+  /* KEYS PAGE */
+  .plan-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .plan-tab {
+    padding: 8px 16px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 500;
+    transition: all .15s;
+  }
+  .plan-tab:hover { border-color: var(--accent); }
+  .plan-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* LOGS */
+  .log-filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .log-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-time { color: var(--muted); font-size: 12px; white-space: nowrap; min-width: 110px; font-family: monospace; }
+  .log-action { font-weight: 600; min-width: 120px; }
+  .log-details { color: var(--muted); }
+  .log-user { color: var(--accent2); min-width: 100px; }
+
+  /* SEARCH */
+  .search-bar {
+    width: 100%; padding: 10px 14px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-size: 14px; outline: none; margin-bottom: 16px;
+  }
+  .search-bar:focus { border-color: var(--accent); }
+
+  .empty { text-align: center; padding: 40px; color: var(--muted); }
+  .loading { text-align: center; padding: 20px; color: var(--muted); }
+
+  .section-gap { margin-bottom: 24px; }
+
+  .toast {
+    position: fixed; top: 20px; right: 20px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 20px; font-size: 13px;
+    z-index: 999; transform: translateX(120%); transition: transform .3s;
+  }
+  .toast.show { transform: translateX(0); }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>🔐 XYLIVPN Admin</h1>
+    <p>Введи API ключ администратора</p>
+    <input type="password" id="key-input" placeholder="ADMIN_API_KEY" />
+    <p class="err-msg" id="err-msg">Неверный ключ</p>
+    <button class="btn btn-primary btn-full" onclick="doLogin()">Войти</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <span><b>XYL</b>IVPN</span><br>
+      <small style="color:var(--muted);font-size:12px">Admin Panel</small>
+    </div>
+    <div class="nav-item active" onclick="showPage('dashboard')">
+      <span class="icon">📊</span> Дашборд
+    </div>
+    <div class="nav-item" onclick="showPage('keys')">
+      <span class="icon">🔑</span> Ключи
+    </div>
+    <div class="nav-item" onclick="showPage('users')">
+      <span class="icon">👥</span> Пользователи
+    </div>
+    <div class="nav-item" onclick="showPage('orders')">
+      <span class="icon">📦</span> Заказы
+    </div>
+    <div class="nav-item" onclick="showPage('plans')">
+      <span class="icon">💎</span> Тарифы
+    </div>
+    <div class="nav-item" onclick="showPage('broadcast')">
+      <span class="icon">📢</span> Рассылка
+    </div>
+    <div class="nav-item" onclick="showPage('logs')">
+      <span class="icon">📋</span> Логи
+    </div>
+    <div class="sidebar-footer">
+      <button onclick="doLogout()">⬅ Выйти</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-title">📊 Дашборд</div>
+      <div class="cards-row" id="stat-cards">
+        <div class="card"><div class="card-label">Выручка</div><div class="card-value green" id="s-revenue">—</div></div>
+        <div class="card"><div class="card-label">Продаж</div><div class="card-value accent" id="s-orders">—</div></div>
+        <div class="card"><div class="card-label">Пользователей</div><div class="card-value cyan" id="s-users">—</div></div>
+        <div class="card"><div class="card-label">Рефералов оплачено</div><div class="card-value yellow" id="s-refs">—</div></div>
+      </div>
+      <div class="cards-row" id="key-stat-cards"></div>
+      <div class="table-wrap section-gap">
+        <div class="table-header"><h3>Последние заказы</h3></div>
+        <div id="recent-orders-table"><div class="loading">Загрузка...</div></div>
+      </div>
+    </div>
+
+    <!-- KEYS -->
+    <div id="page-keys" class="page">
+      <div class="page-title">🔑 Ключи</div>
+      <div class="plan-tabs" id="plan-tabs"></div>
+      <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="openAddKeysModal()">+ Добавить ключи</button>
+        <button class="btn btn-ghost" onclick="loadKeys()">↻ Обновить</button>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3 id="keys-table-title">Все ключи</h3>
+          <span id="keys-count" style="color:var(--muted);font-size:13px"></span>
+        </div>
+        <div id="keys-table"><div class="loading">Загрузка...</div></div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div id="page-users" class="page">
+      <div class="page-title">👥 Пользователи</div>
+      <input class="search-bar" id="users-search" placeholder="Поиск по имени, username, ID..." oninput="filterUsers()">
+      <div class="table-wrap">
+        <div class="table-header"><h3>Все пользователи</h3><button class="btn btn-ghost" onclick="loadUsers()">↻</button></div>
+        <div id="users-table"><div class="loading">Загрузка...</div></div>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div id="page-orders" class="page">
+      <div class="page-title">📦 Заказы</div>
+      <input class="search-bar" id="orders-search" placeholder="Поиск по имени, тарифу..." oninput="filterOrders()">
+      <div class="table-wrap">
+        <div class="table-header"><h3>Все заказы</h3><button class="btn btn-ghost" onclick="loadOrders()">↻</button></div>
+        <div id="orders-table"><div class="loading">Загрузка...</div></div>
+      </div>
+    </div>
+
+    <!-- PLANS -->
+    <div id="page-plans" class="page">
+      <div class="page-title">💎 Тарифы</div>
+      <div style="margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="openCreatePlanModal()">+ Новый тариф</button>
+      </div>
+      <div id="plans-list"><div class="loading">Загрузка...</div></div>
+    </div>
+
+    <!-- BROADCAST -->
+    <div id="page-broadcast" class="page">
+      <div class="page-title">📢 Рассылка</div>
+      <div class="card" style="max-width:560px;">
+        <div class="form-group">
+          <label>Сообщение (поддерживается Markdown)</label>
+          <textarea id="broadcast-text" placeholder="*Жирный*, _курсив_, `код`..."></textarea>
+        </div>
+        <div id="broadcast-preview" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:var(--muted);min-height:40px;">Предпросмотр...</div>
+        <button class="btn btn-primary" onclick="sendBroadcast()">📤 Отправить всем</button>
+        <div id="broadcast-result" style="margin-top:12px;font-size:13px;"></div>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div id="page-logs" class="page">
+      <div class="page-title">📋 Логи</div>
+      <div class="log-filters">
+        <button class="btn btn-ghost plan-tab active" onclick="loadLogs('')" id="log-f-all">Все</button>
+        <button class="btn btn-ghost plan-tab" onclick="loadLogs('command')" id="log-f-command">Команды</button>
+        <button class="btn btn-ghost plan-tab" onclick="loadLogs('callback')" id="log-f-callback">Кнопки</button>
+        <button class="btn btn-ghost plan-tab" onclick="loadLogs('payment')" id="log-f-payment">Платежи</button>
+        <button class="btn btn-ghost plan-tab" onclick="loadLogs('api')" id="log-f-api">API</button>
+        <button class="btn btn-ghost plan-tab" onclick="loadLogs('admin')" id="log-f-admin">Админ</button>
+        <button class="btn btn-ghost" onclick="loadLogs(currentLogFilter)" style="margin-left:auto;">↻ Обновить</button>
+      </div>
+      <div class="table-wrap">
+        <div id="logs-list"><div class="loading">Загрузка...</div></div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal-add-keys">
+  <div class="modal">
+    <h3>➕ Добавить ключи</h3>
+    <div class="form-group">
+      <label>Тариф</label>
+      <select id="add-key-plan"></select>
+    </div>
+    <div class="form-group">
+      <label>Способ добавления</label>
+      <select id="add-key-method" onchange="toggleAddKeyMethod()">
+        <option value="generate">Сгенерировать автоматически</option>
+        <option value="manual">Вставить свои ключи</option>
+      </select>
+    </div>
+    <div id="add-key-count-wrap" class="form-group">
+      <label>Количество ключей</label>
+      <input type="number" id="add-key-count" value="10" min="1" max="1000">
+    </div>
+    <div id="add-key-manual-wrap" class="form-group" style="display:none;">
+      <label>Ключи (каждый с новой строки)</label>
+      <textarea id="add-key-manual" placeholder="ключ1&#10;ключ2&#10;ключ3" style="min-height:140px;"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-keys')">Отмена</button>
+      <button class="btn btn-primary" onclick="submitAddKeys()">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-edit-balance">
+  <div class="modal">
+    <h3>💰 Изменить баланс</h3>
+    <div class="form-group">
+      <label id="edit-balance-user-label">Пользователь</label>
+      <input type="number" id="edit-balance-val" placeholder="Баланс в копейках (100 = 1 ₽)">
+    </div>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:4px;">= <span id="edit-balance-preview">0</span> ₽</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-balance')">Отмена</button>
+      <button class="btn btn-primary" onclick="submitEditBalance()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-edit-plan">
+  <div class="modal">
+    <h3 id="modal-plan-title">Редактировать тариф</h3>
+    <input type="hidden" id="edit-plan-id">
+    <div class="form-row">
+      <div class="form-group"><label>Название</label><input type="text" id="edit-plan-name"></div>
+      <div class="form-group"><label>Дней</label><input type="number" id="edit-plan-days"></div>
+    </div>
+    <div class="form-group"><label>Описание</label><input type="text" id="edit-plan-desc"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Цена (копейки)</label><input type="number" id="edit-plan-price"></div>
+      <div class="form-group"><label>Активен</label>
+        <select id="edit-plan-active">
+          <option value="true">Да</option>
+          <option value="false">Нет</option>
+        </select>
+      </div>
+    </div>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:4px;">= <span id="edit-plan-price-preview">0</span> ₽</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-plan')">Отмена</button>
+      <button class="btn btn-primary" onclick="submitEditPlan()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let adminKey = '';
+let allUsers = [];
+let allOrders = [];
+let currentKeyPlanId = null;
+let currentLogFilter = '';
+let editBalanceUserId = null;
+
+// --- AUTH ---
+async function doLogin() {
+  const k = document.getElementById('key-input').value.trim();
+  if (!k) return;
+  const res = await fetch('/api/admin/stats', { headers: { 'x-admin-key': k } });
+  if (res.ok) {
+    adminKey = k;
+    localStorage.setItem('adminKey', k);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    initApp();
+  } else {
+    document.getElementById('err-msg').style.display = 'block';
+  }
+}
+function doLogout() {
+  localStorage.removeItem('adminKey');
+  location.reload();
+}
+document.getElementById('key-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+const savedKey = localStorage.getItem('adminKey');
+if (savedKey) {
+  adminKey = savedKey;
+  fetch('/api/admin/stats', { headers: { 'x-admin-key': savedKey } }).then(r => {
+    if (r.ok) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      initApp();
+    } else { localStorage.removeItem('adminKey'); adminKey = ''; }
+  });
+}
+
+function initApp() { showPage('dashboard'); }
+
+// --- NAVIGATION ---
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event && event.currentTarget && event.currentTarget.classList.add('active');
+  // Auto-load
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'keys') { loadPlansForTabs(); loadKeys(); }
+  if (name === 'users') loadUsers();
+  if (name === 'orders') loadOrders();
+  if (name === 'plans') loadPlans();
+  if (name === 'logs') loadLogs('');
+}
+// Fix nav highlight
+document.querySelectorAll('.nav-item').forEach(n => {
+  n.addEventListener('click', function() {
+    document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// --- API ---
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { 'x-admin-key': adminKey, 'Content-Type': 'application/json', ...(opts.headers || {}) }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// --- TOAST ---
+function toast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// --- DASHBOARD ---
+async function loadDashboard() {
+  try {
+    const stats = await api('/api/admin/stats');
+    document.getElementById('s-revenue').textContent = (stats.revenue / 100).toFixed(0) + ' ₽';
+    document.getElementById('s-orders').textContent = stats.totalOrders;
+    document.getElementById('s-users').textContent = stats.totalUsers;
+    document.getElementById('s-refs').textContent = stats.totalReferrals;
+
+    // Key stats cards
+    const kc = document.getElementById('key-stat-cards');
+    kc.innerHTML = stats.stats.map(s =>
+      `<div class="card">
+        <div class="card-label">${s.plan}</div>
+        <div style="display:flex;gap:16px;margin-top:8px;">
+          <div><div style="font-size:11px;color:var(--green)">Свободно</div><div style="font-size:22px;font-weight:700;color:var(--green)">${s.available}</div></div>
+          <div><div style="font-size:11px;color:var(--red)">Использовано</div><div style="font-size:22px;font-weight:700;color:var(--red)">${s.used}</div></div>
+        </div>
+      </div>`
+    ).join('');
+
+    // Recent orders
+    const orders = await api('/api/admin/orders');
+    const recent = orders.slice(0, 10);
+    document.getElementById('recent-orders-table').innerHTML = renderOrdersTable(recent);
+  } catch(e) { toast('Ошибка загрузки', 'error'); }
+}
+
+// --- KEYS ---
+let plansList = [];
+async function loadPlansForTabs() {
+  plansList = await api('/api/admin/plans');
+  const tabs = document.getElementById('plan-tabs');
+  tabs.innerHTML = `<div class="plan-tab active" onclick="selectKeyPlan(null, this)">Все</div>` +
+    plansList.map(p => `<div class="plan-tab" onclick="selectKeyPlan(${p.id}, this)">${p.name}</div>`).join('');
+  // Populate add-key modal plan select
+  const sel = document.getElementById('add-key-plan');
+  sel.innerHTML = plansList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+function selectKeyPlan(id, el) {
+  currentKeyPlanId = id;
+  document.querySelectorAll('.plan-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  loadKeys();
+}
+
+async function loadKeys() {
+  const wrap = document.getElementById('keys-table');
+  wrap.innerHTML = '<div class="loading">Загрузка...</div>';
+  const url = currentKeyPlanId ? `/api/admin/keys-list?planId=${currentKeyPlanId}` : '/api/admin/keys-list';
+  const keys = await api(url);
+  const title = currentKeyPlanId ? (plansList.find(p => p.id === currentKeyPlanId)?.name || '') : 'Все ключи';
+  document.getElementById('keys-table-title').textContent = title;
+  document.getElementById('keys-count').textContent = keys.length + ' ключей';
+  if (!keys.length) { wrap.innerHTML = '<div class="empty">Ключей нет</div>'; return; }
+  wrap.innerHTML = `<table>
+    <thead><tr><th>Ключ</th><th>Тариф</th><th>Статус</th><th>Добавлен</th><th></th></tr></thead>
+    <tbody>${keys.map(k => {
+      const plan = plansList.find(p => p.id === k.plan_id);
+      const badge = k.status === 'available'
+        ? '<span class="badge badge-green">свободен</span>'
+        : '<span class="badge badge-red">использован</span>';
+      return `<tr>
+        <td><code>${k.key_value}</code></td>
+        <td>${plan?.name || k.plan_id}</td>
+        <td>${badge}</td>
+        <td style="color:var(--muted)">${fmtDate(k.created_at)}</td>
+        <td><button class="btn btn-danger" style="padding:4px 10px;font-size:12px;" onclick="deleteKey(${k.id})">Удалить</button></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+async function deleteKey(id) {
+  if (!confirm('Удалить ключ?')) return;
+  await api('/api/admin/keys/' + id, { method: 'DELETE' });
+  toast('Ключ удалён');
+  loadKeys();
+  loadDashboard();
+}
+
+function openAddKeysModal() {
+  openModal('modal-add-keys');
+}
+
+function toggleAddKeyMethod() {
+  const m = document.getElementById('add-key-method').value;
+  document.getElementById('add-key-count-wrap').style.display = m === 'generate' ? 'block' : 'none';
+  document.getElementById('add-key-manual-wrap').style.display = m === 'manual' ? 'block' : 'none';
+}
+
+async function submitAddKeys() {
+  const planId = parseInt(document.getElementById('add-key-plan').value);
+  const method = document.getElementById('add-key-method').value;
+  let body = { planId };
+  if (method === 'generate') {
+    body.count = parseInt(document.getElementById('add-key-count').value) || 10;
+  } else {
+    const raw = document.getElementById('add-key-manual').value;
+    const keys = raw.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!keys.length) { toast('Введи ключи', 'error'); return; }
+    body.keys = keys;
+  }
+  try {
+    const r = await api('/api/admin/keys', { method: 'POST', body: JSON.stringify(body) });
+    toast(`Добавлено ${r.added} ключей для «${r.plan}»`);
+    closeModal('modal-add-keys');
+    loadKeys(); loadDashboard();
+  } catch(e) { toast('Ошибка: ' + e.message, 'error'); }
+}
+
+// --- USERS ---
+async function loadUsers() {
+  allUsers = await api('/api/admin/users');
+  renderUsers(allUsers);
+}
+
+function filterUsers() {
+  const q = document.getElementById('users-search').value.toLowerCase();
+  renderUsers(allUsers.filter(u =>
+    (u.first_name || '').toLowerCase().includes(q) ||
+    (u.username || '').toLowerCase().includes(q) ||
+    String(u.telegram_id).includes(q)
+  ));
+}
+
+function renderUsers(users) {
+  const wrap = document.getElementById('users-table');
+  if (!users.length) { wrap.innerHTML = '<div class="empty">Нет пользователей</div>'; return; }
+  wrap.innerHTML = `<table>
+    <thead><tr><th>Telegram ID</th><th>Имя</th><th>Username</th><th>Баланс</th><th>Покупок</th><th>Рефералов</th><th>Дата</th><th></th></tr></thead>
+    <tbody>${users.map(u => `<tr>
+      <td><code>${u.telegram_id}</code></td>
+      <td>${u.first_name || '—'} ${u.last_name || ''}</td>
+      <td>${u.username ? '@' + u.username : '—'}</td>
+      <td style="color:var(--green);font-weight:600;">${(u.balance / 100).toFixed(2)} ₽</td>
+      <td>${u.paid_orders}</td>
+      <td>${u.paid_referrals}</td>
+      <td style="color:var(--muted)">${fmtDate(u.created_at)}</td>
+      <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" onclick="openEditBalance(${u.telegram_id}, '${u.first_name || u.username || u.telegram_id}', ${u.balance})">Баланс</button></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function openEditBalance(tid, name, balance) {
+  editBalanceUserId = tid;
+  document.getElementById('edit-balance-user-label').textContent = name + ' (' + tid + ')';
+  document.getElementById('edit-balance-val').value = balance;
+  document.getElementById('edit-balance-preview').textContent = (balance / 100).toFixed(2);
+  openModal('modal-edit-balance');
+}
+document.getElementById('edit-balance-val').addEventListener('input', function() {
+  document.getElementById('edit-balance-preview').textContent = (parseFloat(this.value || 0) / 100).toFixed(2);
+});
+
+async function submitEditBalance() {
+  const balance = parseInt(document.getElementById('edit-balance-val').value);
+  await api('/api/admin/users/' + editBalanceUserId + '/balance', { method: 'PUT', body: JSON.stringify({ balance }) });
+  toast('Баланс обновлён');
+  closeModal('modal-edit-balance');
+  loadUsers();
+}
+
+// --- ORDERS ---
+async function loadOrders() {
+  allOrders = await api('/api/admin/orders');
+  renderOrders(allOrders);
+}
+
+function filterOrders() {
+  const q = document.getElementById('orders-search').value.toLowerCase();
+  renderOrders(allOrders.filter(o =>
+    (o.plan_name || '').toLowerCase().includes(q) ||
+    (o.first_name || '').toLowerCase().includes(q) ||
+    (o.telegram_username || '').toLowerCase().includes(q)
+  ));
+}
+
+function renderOrders(orders) {
+  document.getElementById('orders-table').innerHTML = renderOrdersTable(orders);
+}
+
+function renderOrdersTable(orders) {
+  if (!orders.length) return '<div class="empty">Заказов нет</div>';
+  return `<table>
+    <thead><tr><th>ID</th><th>Пользователь</th><th>Тариф</th><th>Ключ</th><th>Статус</th><th>Дата</th></tr></thead>
+    <tbody>${orders.map(o => {
+      const badge = o.status === 'paid'
+        ? '<span class="badge badge-green">оплачен</span>'
+        : '<span class="badge badge-yellow">ожидание</span>';
+      return `<tr>
+        <td style="color:var(--muted);font-size:12px">${String(o.id).slice(-6)}</td>
+        <td>${o.first_name || ''} ${o.telegram_username ? '@' + o.telegram_username : ''}<br><small style="color:var(--muted)">${o.telegram_user_id}</small></td>
+        <td>${o.plan_name}</td>
+        <td>${o.key_value ? `<code>${o.key_value}</code>` : '—'}</td>
+        <td>${badge}</td>
+        <td style="color:var(--muted)">${fmtDate(o.paid_at || o.created_at)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+// --- PLANS ---
+async function loadPlans() {
+  const plans = await api('/api/admin/plans');
+  document.getElementById('plans-list').innerHTML = `
+    <div style="display:grid;gap:16px;max-width:700px;">
+      ${plans.map(p => `
+        <div class="card" style="display:flex;align-items:center;gap:16px;">
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:16px;">${p.name}</div>
+            <div style="color:var(--muted);font-size:13px;margin:4px 0;">${p.description}</div>
+            <div style="font-size:13px;">
+              <span style="color:var(--green);font-weight:600;">${(p.price/100).toFixed(0)} ₽</span>
+              · ${p.duration_days} дней
+              · ${p.active ? '<span class="badge badge-green">активен</span>' : '<span class="badge badge-red">скрыт</span>'}
+            </div>
+          </div>
+          <button class="btn btn-ghost" onclick="openEditPlan(${JSON.stringify(p).split('"').join('&quot;')})">Редактировать</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function openCreatePlanModal() {
+  document.getElementById('modal-plan-title').textContent = '➕ Новый тариф';
+  document.getElementById('edit-plan-id').value = '';
+  document.getElementById('edit-plan-name').value = '';
+  document.getElementById('edit-plan-days').value = '30';
+  document.getElementById('edit-plan-desc').value = '';
+  document.getElementById('edit-plan-price').value = '';
+  document.getElementById('edit-plan-active').value = 'true';
+  openModal('modal-edit-plan');
+}
+
+function openEditPlan(p) {
+  if (typeof p === 'string') p = JSON.parse(p.split('&quot;').join('"'));
+  document.getElementById('modal-plan-title').textContent = '✏️ Редактировать тариф';
+  document.getElementById('edit-plan-id').value = p.id;
+  document.getElementById('edit-plan-name').value = p.name;
+  document.getElementById('edit-plan-days').value = p.duration_days;
+  document.getElementById('edit-plan-desc').value = p.description;
+  document.getElementById('edit-plan-price').value = p.price;
+  document.getElementById('edit-plan-price-preview').textContent = (p.price / 100).toFixed(2);
+  document.getElementById('edit-plan-active').value = String(p.active);
+  openModal('modal-edit-plan');
+}
+document.getElementById('edit-plan-price').addEventListener('input', function() {
+  document.getElementById('edit-plan-price-preview').textContent = (parseFloat(this.value || 0) / 100).toFixed(2);
+});
+
+async function submitEditPlan() {
+  const id = document.getElementById('edit-plan-id').value;
+  const body = {
+    name: document.getElementById('edit-plan-name').value,
+    description: document.getElementById('edit-plan-desc').value,
+    duration_days: parseInt(document.getElementById('edit-plan-days').value),
+    price: parseInt(document.getElementById('edit-plan-price').value),
+    active: document.getElementById('edit-plan-active').value === 'true'
+  };
+  if (id) {
+    await api('/api/admin/plans/' + id, { method: 'PUT', body: JSON.stringify(body) });
+    toast('Тариф обновлён');
+  } else {
+    await api('/api/admin/plans', { method: 'POST', body: JSON.stringify(body) });
+    toast('Тариф создан');
+  }
+  closeModal('modal-edit-plan');
+  loadPlans();
+}
+
+// --- BROADCAST ---
+document.getElementById('broadcast-text').addEventListener('input', function() {
+  document.getElementById('broadcast-preview').textContent = this.value || 'Предпросмотр...';
+});
+
+async function sendBroadcast() {
+  const message = document.getElementById('broadcast-text').value.trim();
+  if (!message) { toast('Введи сообщение', 'error'); return; }
+  if (!confirm(`Отправить сообщение всем пользователям?`)) return;
+  const r = document.getElementById('broadcast-result');
+  r.textContent = 'Отправка...';
+  try {
+    const res = await api('/api/admin/broadcast', { method: 'POST', body: JSON.stringify({ message }) });
+    r.innerHTML = `<span style="color:var(--green)">✅ Отправлено: ${res.sent}</span>  <span style="color:var(--red)">Ошибок: ${res.failed}</span>`;
+    toast('Рассылка завершена');
+  } catch(e) { r.textContent = 'Ошибка: ' + e.message; }
+}
+
+// --- LOGS ---
+async function loadLogs(type) {
+  currentLogFilter = type;
+  // Update filter buttons
+  ['all','command','callback','payment','api','admin'].forEach(f => {
+    const el = document.getElementById('log-f-' + (f === '' ? 'all' : f));
+    if (el) el.classList.toggle('active', f === (type || 'all'));
+  });
+  const list = document.getElementById('logs-list');
+  list.innerHTML = '<div class="loading">Загрузка...</div>';
+  const url = '/api/admin/logs' + (type ? '?type=' + type : '');
+  const logs = await api(url);
+  if (!logs.length) { list.innerHTML = '<div class="empty">Логов нет</div>'; return; }
+  const typeBadge = {
+    command: '<span class="badge badge-blue">команда</span>',
+    callback: '<span class="badge badge-cyan">кнопка</span>',
+    payment: '<span class="badge badge-green">платёж</span>',
+    api: '<span class="badge badge-yellow">api</span>',
+    admin: '<span class="badge badge-red">админ</span>'
+  };
+  list.innerHTML = logs.map(l => `
+    <div class="log-item">
+      <div class="log-time">${fmtDateTime(l.created_at)}</div>
+      <div>${typeBadge[l.type] || l.type}</div>
+      <div class="log-user">${l.username ? '@' + l.username : (l.user_id || '—')}</div>
+      <div class="log-action">${l.action}</div>
+      <div class="log-details">${l.details || ''}</div>
+    </div>
+  `).join('');
+}
+
+// --- UTILS ---
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' +
+    d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+</script>
+</body>
+</html>

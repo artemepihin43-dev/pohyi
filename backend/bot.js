@@ -4,6 +4,20 @@ const { getAvailableKey, markKeyUsed } = require('./keys');
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
+function addLog(type, userId, username, action, details = '') {
+  try {
+    db.get('logs').push({
+      id: Date.now() + Math.random(),
+      type,
+      user_id: userId || null,
+      username: username || null,
+      action,
+      details,
+      created_at: new Date().toISOString()
+    }).write();
+  } catch (e) {}
+}
+
 const WEB_APP_URL = process.env.WEB_APP_URL || 'https://your-domain.com';
 const REFERRAL_BONUS = 6900; // 69 рублей в копейках
 
@@ -66,6 +80,7 @@ bot.onText(/\/start(?:\s+(.+))?/, (msg, match) => {
 
   const isNew = !db.get('users').find({ telegram_id: tgUser.id }).value();
   const user = getOrCreateUser(tgUser);
+  addLog('command', tgUser.id, tgUser.username, '/start', refCode ? `ref: ${refCode}` : '');
 
   // При первом запуске сохраняем реферала (статус pending — бонус ещё не начислен)
   if (isNew && refCode && refCode.startsWith('ref')) {
@@ -115,6 +130,7 @@ bot.onText(/\/start(?:\s+(.+))?/, (msg, match) => {
 // /mykeys
 bot.onText(/\/mykeys/, (msg) => {
   const chatId = msg.chat.id;
+  addLog('command', msg.from.id, msg.from.username, '/mykeys');
   const orders = db.get('orders').filter({ telegram_user_id: msg.from.id, status: 'paid' }).value();
 
   if (!orders.length) {
@@ -135,6 +151,7 @@ bot.onText(/\/mykeys/, (msg) => {
 
 // /balance
 bot.onText(/\/balance/, (msg) => {
+  addLog('command', msg.from.id, msg.from.username, '/balance');
   const user = db.get('users').find({ telegram_id: msg.from.id }).value();
   bot.sendMessage(msg.chat.id,
     `💰 *Твой баланс:* ${((user?.balance || 0) / 100).toFixed(2)} ₽`,
@@ -144,6 +161,7 @@ bot.onText(/\/balance/, (msg) => {
 
 // /ref
 bot.onText(/\/ref/, (msg) => {
+  addLog('command', msg.from.id, msg.from.username, '/ref');
   const user = getOrCreateUser(msg.from);
   const refLink = `https://t.me/${process.env.BOT_USERNAME || 'vpnxyliBot'}?start=${user.ref_code}`;
   const allReferrals = db.get('referrals').filter({ referrer_id: msg.from.id }).value();
@@ -164,6 +182,7 @@ bot.onText(/\/ref/, (msg) => {
 
 // /admin
 bot.onText(/\/admin/, (msg) => {
+  addLog('command', msg.from.id, msg.from.username, '/admin');
   if (String(msg.from.id) !== String(process.env.ADMIN_TELEGRAM_ID)) {
     return bot.sendMessage(msg.chat.id, '❌ Нет доступа.');
   }
@@ -196,6 +215,7 @@ bot.onText(/\/admin/, (msg) => {
 // Callback кнопки
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
+  addLog('callback', query.from.id, query.from.username, query.data);
 
   if (query.data === 'my_keys') {
     bot.answerCallbackQuery(query.id);
@@ -260,6 +280,7 @@ bot.on('successful_payment', (msg) => {
   const payment = msg.successful_payment;
   const planId = parseInt(payment.invoice_payload.replace('plan_', ''));
   const userId = msg.from.id;
+  addLog('payment', userId, msg.from.username, 'successful_payment', `plan_${planId}, charge_id: ${payment.telegram_payment_charge_id}`);
 
   const key = getAvailableKey(planId);
   if (!key) {
@@ -292,4 +313,4 @@ bot.on('successful_payment', (msg) => {
   );
 });
 
-module.exports = { bot, tryPayReferralBonus };
+module.exports = { bot, tryPayReferralBonus, addLog };
