@@ -62,7 +62,7 @@ async function loadProfile() {
 
 // ─── КНОПКА "ПРИГЛАСИТЬ" ────────────────────────
 document.getElementById('ref-btn').addEventListener('click', () => {
-  if (!currentUser) return showToast('⚠ ОТКРОЙ ЧЕРЕЗ TELEGRAM');
+  if (!currentUser) return showToast('⚠ Открой через Telegram');
   shareRefLink();
 });
 
@@ -70,9 +70,9 @@ function shareRefLink() {
   if (!currentUser) return;
   const link = currentUser.referral_link;
   if (navigator.share) {
-    navigator.share({ title: 'VPN.CYBER', text: '🔐 Получи доступ к VPN!', url: link }).catch(() => {});
+    navigator.share({ title: 'XYLIVPN', text: '🔐 Получи доступ к XYLIVPN!', url: link }).catch(() => {});
   } else {
-    navigator.clipboard.writeText(link).then(() => showToast('✅ ССЫЛКА СКОПИРОВАНА'));
+    navigator.clipboard.writeText(link).then(() => showToast('✅ Ссылка скопирована'));
   }
 }
 
@@ -84,7 +84,7 @@ async function loadPlans() {
     const plans = await res.json();
 
     if (!plans.length) {
-      container.innerHTML = '<div class="empty-state"><span class="empty-icon">⬡</span><h3>НЕТ ТАРИФОВ</h3><p>Скоро появятся</p></div>';
+      container.innerHTML = '<div class="empty-state"><span class="empty-icon">⬡</span><h3>НЕТ ТАРИФОВ</h3><p>Скоро появятся новые тарифы</p></div>';
       return;
     }
 
@@ -102,7 +102,7 @@ async function loadPlans() {
         </div>
         <p class="plan-desc">${plan.description}</p>
         <button class="plan-buy-btn" ${!plan.in_stock ? 'disabled' : ''} data-plan-id="${plan.id}">
-          ${plan.in_stock ? '[ КУПИТЬ ]' : '[ НЕДОСТУПНО ]'}
+          ${plan.in_stock ? '[ КУПИТЬ ]' : '[ НЕТ В НАЛИЧИИ ]'}
         </button>
       `;
       card.querySelector('.plan-buy-btn').addEventListener('click', (e) => {
@@ -112,7 +112,7 @@ async function loadPlans() {
       container.appendChild(card);
     });
   } catch {
-    container.innerHTML = `<div class="empty-state"><span class="empty-icon">⚠</span><h3>ОШИБКА СВЯЗИ</h3><p>Попробуй позже</p></div>`;
+    container.innerHTML = `<div class="empty-state"><span class="empty-icon">⚠</span><h3>ОШИБКА СВЯЗИ</h3><p>Попробуй чуть позже</p></div>`;
   }
 }
 
@@ -132,7 +132,7 @@ function openConfirmModal(plan) {
     </div>
     ${balance > 0 ? `
     <div class="modal-balance-row">
-      <span class="modal-balance-label">⚡ БАЛАНС: ${formatPrice(balance)} ₽</span>
+      <span class="modal-balance-label">⚡ МОЙ БАЛАНС: ${formatPrice(balance)} ₽</span>
       <span class="modal-balance-value">${canPayWithBalance ? 'ХВАТАЕТ' : 'НЕ ХВАТАЕТ'}</span>
     </div>` : ''}
     <button class="modal-confirm-btn" id="confirm-pay">
@@ -159,12 +159,13 @@ function closeModal() {
 async function createInvoice(planId) {
   const data = initData();
   if (!data) {
-    showToast('⚠ ОТКРОЙ ЧЕРЕЗ TELEGRAM');
+    showToast('⚠ Открой приложение через Telegram');
     return;
   }
 
   const btn = document.querySelector(`[data-plan-id="${planId}"]`);
   if (btn) { btn.disabled = true; btn.textContent = '[ ОБРАБОТКА... ]'; }
+
 
   try {
     const res = await fetch(`${API_URL}/api/create-invoice`, {
@@ -176,10 +177,10 @@ async function createInvoice(planId) {
 
     if (json.ok) {
       if (json.paid_with_balance) {
-        showToast('✅ ОПЛАЧЕНО С БАЛАНСА');
+        showToast('✅ Успешно оплачено с баланса');
         await loadProfile();
       } else {
-        showToast('✅ СЧЁТ ОТПРАВЛЕН В TELEGRAM');
+        showToast('✅ Счёт отправлен в Telegram');
         tg.close();
       }
     } else {
@@ -187,7 +188,7 @@ async function createInvoice(planId) {
       if (btn) { btn.disabled = false; btn.textContent = '[ КУПИТЬ ]'; }
     }
   } catch {
-    showToast('✘ ОШИБКА СОЕДИНЕНИЯ');
+    showToast('✘ Ошибка соединения');
     if (btn) { btn.disabled = false; btn.textContent = '[ КУПИТЬ ]'; }
   }
 }
@@ -199,7 +200,7 @@ async function loadOrders() {
 
   const data = initData();
   if (!data) {
-    container.innerHTML = '<div class="empty-state"><span class="empty-icon">🔒</span><h3>ОТКРОЙ ЧЕРЕЗ TELEGRAM</h3></div>';
+    container.innerHTML = '<div class="empty-state"><span class="empty-icon">🔒</span><h3>ОТКРОЙ ЧЕРЕЗ TELEGRAM</h3><p>Приложение работает только внутри Telegram</p></div>';
     return;
   }
 
@@ -212,7 +213,7 @@ async function loadOrders() {
         <div class="empty-state">
           <span class="empty-icon">⬡</span>
           <h3>КЛЮЧЕЙ НЕТ</h3>
-          <p>Перейди в раздел МАГАЗИН<br>чтобы получить ключ доступа</p>
+          <p>Перейди в раздел «Магазин»<br>чтобы получить ключ доступа</p>
         </div>`;
       return;
     }
@@ -227,23 +228,23 @@ async function loadOrders() {
         <div class="order-header">
           <div class="order-plan">${order.plan_name}</div>
           <div class="order-status ${order.status === 'paid' ? 'status-paid' : 'status-pending'}">
-            ${order.status === 'paid' ? '● АКТИВЕН' : '○ ОЖИДАНИЕ'}
+            ${order.status === 'paid' ? '● АКТИВЕН' : '○ ОЖИДАЕТ ОПЛАТЫ'}
           </div>
         </div>
         ${order.key_value ? `
           <div class="order-key">
             <div class="key-value">${order.key_value}</div>
-            <button class="copy-btn" data-key="${order.key_value}">⧉</button>
+            <button class="copy-btn" data-key="${order.key_value}" title="Скопировать ключ">⧉</button>
           </div>
         ` : ''}
-        <div class="order-date">// ${date}</div>
+        <div class="order-date">// Дата: ${date}</div>
       `;
 
       const copyBtn = card.querySelector('.copy-btn');
       if (copyBtn) {
         copyBtn.addEventListener('click', () => {
           navigator.clipboard.writeText(copyBtn.dataset.key).then(() => {
-            showToast('✅ КЛЮЧ СКОПИРОВАН');
+            showToast('✅ Ключ скопирован');
             copyBtn.textContent = '✓';
             setTimeout(() => { copyBtn.textContent = '⧉'; }, 1500);
           });
@@ -253,7 +254,7 @@ async function loadOrders() {
       container.appendChild(card);
     });
   } catch {
-    container.innerHTML = '<div class="empty-state"><span class="empty-icon">⚠</span><h3>ОШИБКА СВЯЗИ</h3><p>Попробуй позже</p></div>';
+    container.innerHTML = '<div class="empty-state"><span class="empty-icon">⚠</span><h3>ОШИБКА СВЯЗИ</h3><p>Не удалось загрузить данные. Попробуй позже</p></div>';
   }
 }
 
@@ -261,7 +262,7 @@ async function loadOrders() {
 function loadReferralPage() {
   const container = document.getElementById('referral-page');
   if (!currentUser) {
-    container.innerHTML = '<div class="empty-state"><span class="empty-icon">🔒</span><h3>ОТКРОЙ ЧЕРЕЗ TELEGRAM</h3></div>';
+    container.innerHTML = '<div class="empty-state"><span class="empty-icon">🔒</span><h3>ОТКРОЙ ЧЕРЕЗ TELEGRAM</h3><p>Приложение работает только внутри Telegram</p></div>';
     return;
   }
 
@@ -274,22 +275,22 @@ function loadReferralPage() {
       <div class="ref-hero-title">РЕФЕРАЛЬНАЯ ПРОГРАММА</div>
       <div class="ref-hero-sub">Приглашай друзей — получай бонусы на баланс</div>
       <div class="ref-bonus-badge">+69 ₽ за друга</div>
-      <div class="ref-hero-sub">Бонус зачисляется после того как друг <b>оформит подписку</b></div>
+      <div class="ref-hero-sub">Бонус зачисляется после того, как друг <b>оформит подписку</b></div>
     </div>
 
     <div class="ref-stats-row">
       <div class="ref-stat-card">
-        <div class="ref-stat-label">// КУПИЛИ</div>
+        <div class="ref-stat-label">// ОФОРМИЛИ ПОДПИСКУ</div>
         <div class="ref-stat-value cyan">${referral_count || 0}</div>
       </div>
       <div class="ref-stat-card">
-        <div class="ref-stat-label">// ЖДУТ ПОКУПКИ</div>
+        <div class="ref-stat-label">// ЕЩЁ НЕ КУПИЛИ</div>
         <div class="ref-stat-value" style="color:var(--yellow)">${referral_pending || 0}</div>
       </div>
     </div>
     <div class="ref-stats-row" style="margin-top:10px">
       <div class="ref-stat-card" style="grid-column:1/-1">
-        <div class="ref-stat-label">// ЗАРАБОТАНО</div>
+        <div class="ref-stat-label">// ИТОГО ЗАРАБОТАНО</div>
         <div class="ref-stat-value green">${formatPrice(earned)} ₽</div>
       </div>
     </div>
@@ -312,18 +313,18 @@ function loadReferralPage() {
       </div>
       <div class="ref-how-item">
         <div class="ref-how-num">3</div>
-        <div class="ref-how-text">Тебе мгновенно начисляется +69 ₽ на баланс</div>
+        <div class="ref-how-text">Как только друг оформит подписку — тебе начислится +69 ₽</div>
       </div>
       <div class="ref-how-item">
         <div class="ref-how-num">4</div>
-        <div class="ref-how-text">Используй баланс для оплаты ключей в магазине</div>
+        <div class="ref-how-text">Используй накопленный баланс для оплаты своих ключей</div>
       </div>
     </div>
   `;
 
   document.getElementById('copy-ref-link').addEventListener('click', () => {
     navigator.clipboard.writeText(referral_link).then(() => {
-      showToast('✅ ССЫЛКА СКОПИРОВАНА');
+      showToast('✅ Ссылка скопирована');
     });
   });
 }
