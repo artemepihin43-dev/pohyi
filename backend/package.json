@@ -11,9 +11,8 @@
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "node-telegram-bot-api": "^0.64.0",
-    "better-sqlite3": "^9.4.3",
+    "lowdb": "^1.0.0",
     "dotenv": "^16.4.1",
-    "crypto": "^1.0.1",
     "uuid": "^9.0.0"
   },
   "devDependencies": {

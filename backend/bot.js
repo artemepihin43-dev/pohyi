@@ -12,14 +12,23 @@ bot.onText(/\/start/, (msg) => {
   const user = msg.from;
 
   // Save/update user
-  db.prepare(`
-    INSERT INTO users (telegram_id, username, first_name, last_name)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(telegram_id) DO UPDATE SET
-      username = excluded.username,
-      first_name = excluded.first_name,
-      last_name = excluded.last_name
-  `).run(user.id, user.username || null, user.first_name || null, user.last_name || null);
+  const existing = db.get('users').find({ telegram_id: user.id }).value();
+  if (existing) {
+    db.get('users').find({ telegram_id: user.id }).assign({
+      username: user.username || null,
+      first_name: user.first_name || null,
+      last_name: user.last_name || null
+    }).write();
+  } else {
+    db.get('users').push({
+      id: Date.now(),
+      telegram_id: user.id,
+      username: user.username || null,
+      first_name: user.first_name || null,
+      last_name: user.last_name || null,
+      created_at: new Date().toISOString()
+    }).write();
+  }
 
   bot.sendMessage(chatId,
     `👋 Привет, *${user.first_name || 'друг'}*!\n\n` +
@@ -54,24 +63,18 @@ bot.onText(/\/start/, (msg) => {
 // /mykeys command
 bot.onText(/\/mykeys/, (msg) => {
   const chatId = msg.chat.id;
-  const orders = db.prepare(`
-    SELECT o.*, k.key_value, p.name as plan_name, p.duration_days
-    FROM orders o
-    LEFT JOIN vpn_keys k ON k.id = o.vpn_key_id
-    LEFT JOIN plans p ON p.id = o.plan_id
-    WHERE o.telegram_user_id = ? AND o.status = 'paid'
-    ORDER BY o.paid_at DESC
-    LIMIT 10
-  `).all(msg.from.id);
+  const orders = db.get('orders').filter({ telegram_user_id: msg.from.id, status: 'paid' }).value();
 
   if (!orders.length) {
     return bot.sendMessage(chatId, '❌ У тебя пока нет купленных ключей.\n\nНажми /start чтобы открыть магазин.');
   }
 
   let text = '🔑 *Твои ключи VPN:*\n\n';
-  orders.forEach((o, i) => {
-    text += `*${i + 1}. ${o.plan_name}*\n`;
-    text += `\`${o.key_value}\`\n`;
+  orders.slice(-10).reverse().forEach((o, i) => {
+    const key = db.get('vpn_keys').find({ id: o.vpn_key_id }).value();
+    const plan = db.get('plans').find({ id: o.plan_id }).value();
+    text += `*${i + 1}. ${plan?.name || '—'}*\n`;
+    text += `\`${key?.key_value || '—'}\`\n`;
     text += `📅 Куплено: ${o.paid_at?.slice(0, 10)}\n\n`;
   });
 
@@ -84,45 +87,45 @@ bot.onText(/\/admin/, (msg) => {
     return bot.sendMessage(msg.chat.id, '❌ Нет доступа.');
   }
 
-  const plans = db.prepare('SELECT * FROM plans WHERE active = 1').all();
+  const plans = db.get('plans').filter({ active: true }).value();
   const stats = plans.map(p => {
-    const available = db.prepare("SELECT COUNT(*) as cnt FROM vpn_keys WHERE plan_id = ? AND status = 'available'").get(p.id);
-    const used = db.prepare("SELECT COUNT(*) as cnt FROM vpn_keys WHERE plan_id = ? AND status = 'used'").get(p.id);
-    return `*${p.name}*: 🟢 ${available.cnt} свободно / 🔴 ${used.cnt} использовано`;
+    const available = db.get('vpn_keys').filter({ plan_id: p.id, status: 'available' }).size().value();
+    const used = db.get('vpn_keys').filter({ plan_id: p.id, status: 'used' }).size().value();
+    return `*${p.name}*: 🟢 ${available} свободно / 🔴 ${used} использовано`;
   }).join('\n');
 
-  const totalOrders = db.prepare("SELECT COUNT(*) as cnt FROM orders WHERE status = 'paid'").get();
-  const revenue = db.prepare("SELECT SUM(p.price) as total FROM orders o JOIN plans p ON p.id = o.plan_id WHERE o.status = 'paid'").get();
+  const totalOrders = db.get('orders').filter({ status: 'paid' }).size().value();
+  const paidOrders = db.get('orders').filter({ status: 'paid' }).value();
+  const revenue = paidOrders.reduce((sum, o) => {
+    const plan = db.get('plans').find({ id: o.plan_id }).value();
+    return sum + (plan?.price || 0);
+  }, 0);
+  const totalUsers = db.get('users').size().value();
 
   bot.sendMessage(msg.chat.id,
     `📊 *Статистика магазина*\n\n` +
     `*Ключи по тарифам:*\n${stats}\n\n` +
-    `*Всего продаж:* ${totalOrders.cnt}\n` +
-    `*Выручка:* ${((revenue.total || 0) / 100).toFixed(2)} руб.`,
+    `*Всего продаж:* ${totalOrders}\n` +
+    `*Выручка:* ${(revenue / 100).toFixed(2)} руб.\n` +
+    `*Пользователей:* ${totalUsers}`,
     {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [[
-          { text: '➕ Добавить ключи', callback_data: 'admin_add_keys' }
+          { text: '➕ Как добавить ключи', callback_data: 'admin_add_keys' }
         ]]
       }
     }
   );
 });
 
+// Callback buttons
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
 
   if (query.data === 'my_keys') {
     bot.answerCallbackQuery(query.id);
-    const orders = db.prepare(`
-      SELECT o.*, k.key_value, p.name as plan_name
-      FROM orders o
-      LEFT JOIN vpn_keys k ON k.id = o.vpn_key_id
-      LEFT JOIN plans p ON p.id = o.plan_id
-      WHERE o.telegram_user_id = ? AND o.status = 'paid'
-      ORDER BY o.paid_at DESC LIMIT 10
-    `).all(query.from.id);
+    const orders = db.get('orders').filter({ telegram_user_id: query.from.id, status: 'paid' }).value();
 
     if (!orders.length) {
       return bot.sendMessage(chatId,
@@ -130,7 +133,7 @@ bot.on('callback_query', (query) => {
         {
           reply_markup: {
             inline_keyboard: [[
-              { text: '🛒 В магазин', web_app: { url: process.env.WEB_APP_URL || 'https://your-domain.com' } }
+              { text: '🛒 В магазин', web_app: { url: WEB_APP_URL } }
             ]]
           }
         }
@@ -138,9 +141,11 @@ bot.on('callback_query', (query) => {
     }
 
     let text = '🔑 *Твои VPN ключи:*\n\n';
-    orders.forEach((o, i) => {
-      text += `*${i + 1}. ${o.plan_name}*\n`;
-      text += `\`${o.key_value}\`\n`;
+    orders.slice(-10).reverse().forEach((o, i) => {
+      const key = db.get('vpn_keys').find({ id: o.vpn_key_id }).value();
+      const plan = db.get('plans').find({ id: o.plan_id }).value();
+      text += `*${i + 1}. ${plan?.name || '—'}*\n`;
+      text += `\`${key?.key_value || '—'}\`\n`;
       text += `📅 ${o.paid_at?.slice(0, 10)}\n\n`;
     });
     bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
@@ -176,7 +181,7 @@ bot.on('callback_query', (query) => {
   }
 });
 
-// Handle successful payment from Telegram
+// Telegram Payments
 bot.on('pre_checkout_query', (query) => {
   bot.answerPreCheckoutQuery(query.id, true);
 });
@@ -194,21 +199,27 @@ bot.on('successful_payment', (msg) => {
 
   markKeyUsed(key.id);
 
-  // Update order
-  db.prepare(`
-    UPDATE orders SET status = 'paid', vpn_key_id = ?, paid_at = datetime('now'), payment_id = ?
-    WHERE telegram_user_id = ? AND plan_id = ? AND status = 'pending'
-    ORDER BY created_at DESC LIMIT 1
-  `).run(key.id, payment.telegram_payment_charge_id, userId, planId);
+  const order = db.get('orders')
+    .find({ telegram_user_id: userId, plan_id: planId, status: 'pending' })
+    .value();
 
-  const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(planId);
+  if (order) {
+    db.get('orders').find({ id: order.id }).assign({
+      status: 'paid',
+      vpn_key_id: key.id,
+      paid_at: new Date().toISOString(),
+      payment_id: payment.telegram_payment_charge_id
+    }).write();
+  }
+
+  const plan = db.get('plans').find({ id: planId }).value();
 
   bot.sendMessage(msg.chat.id,
     `✅ *Оплата прошла успешно!*\n\n` +
-    `📦 Тариф: *${plan.name}*\n\n` +
+    `📦 Тариф: *${plan?.name}*\n\n` +
     `🔑 *Твой VPN ключ:*\n\`${key.key_value}\`\n\n` +
     `📋 Сохрани этот ключ — он понадобится для подключения к серверу.\n\n` +
-    `❓ По вопросам: /help`,
+    `❓ По вопросам напиши /start`,
     { parse_mode: 'Markdown' }
   );
 });
