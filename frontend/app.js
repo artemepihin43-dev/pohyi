@@ -6,97 +6,6 @@ const API_URL = 'https://xylivpn-backend-production.up.railway.app';
 
 let currentUser = null;
 
-// ─── CANVAS АНИМАЦИЯ ───────────────────────────
-(function initCanvas() {
-  const canvas = document.getElementById('bg-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-
-  let W, H, nodes, animId;
-
-  const NODE_COUNT = 55;
-  const MAX_DIST = 140;
-  const NODE_RADIUS = 1.8;
-
-  function resize() {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-  }
-
-  function makeNode() {
-    return {
-      x: Math.random() * W,
-      y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.4,
-      vy: (Math.random() - 0.5) * 0.4,
-      r: NODE_RADIUS + Math.random() * 1.2
-    };
-  }
-
-  function initNodes() {
-    nodes = Array.from({ length: NODE_COUNT }, makeNode);
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-
-    // рёбра
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const dx = nodes[i].x - nodes[j].x;
-        const dy = nodes[i].y - nodes[j].y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < MAX_DIST) {
-          const alpha = (1 - dist / MAX_DIST) * 0.35;
-          ctx.strokeStyle = `rgba(99,179,237,${alpha})`;
-          ctx.lineWidth = 0.6;
-          ctx.beginPath();
-          ctx.moveTo(nodes[i].x, nodes[i].y);
-          ctx.lineTo(nodes[j].x, nodes[j].y);
-          ctx.stroke();
-        }
-      }
-    }
-
-    // узлы
-    nodes.forEach(n => {
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(99,179,237,0.55)';
-      ctx.shadowColor = '#63b3ed';
-      ctx.shadowBlur = 6;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    });
-  }
-
-  function update() {
-    nodes.forEach(n => {
-      n.x += n.vx;
-      n.y += n.vy;
-      if (n.x < 0 || n.x > W) n.vx *= -1;
-      if (n.y < 0 || n.y > H) n.vy *= -1;
-    });
-  }
-
-  function loop() {
-    update();
-    draw();
-    animId = requestAnimationFrame(loop);
-  }
-
-  resize();
-  initNodes();
-  loop();
-
-  window.addEventListener('resize', () => {
-    cancelAnimationFrame(animId);
-    resize();
-    initNodes();
-    loop();
-  });
-})();
-
 // ─── ТАБЫ ──────────────────────────────────────
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -110,7 +19,7 @@ document.querySelectorAll('.tab').forEach(btn => {
 });
 
 // ─── ХЕЛПЕРЫ ───────────────────────────────────
-function formatPrice(kopeks) {
+function fmt(kopeks) {
   return (kopeks / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
 }
 
@@ -124,47 +33,46 @@ function showToast(msg) {
   setTimeout(() => el.remove(), 2500);
 }
 
-function initData() {
-  return tg.initData || '';
-}
+function initData() { return tg.initData || ''; }
 
-// ─── ЗАГРУЗКА ПРОФИЛЯ ───────────────────────────
+const checkSvg = `<svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+  <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+// ─── ПРОФИЛЬ ───────────────────────────────────
 async function loadProfile() {
   try {
-    const res = await fetch(`${API_URL}/api/me`, {
-      headers: { 'x-init-data': initData() }
-    });
+    const res = await fetch(`${API_URL}/api/me`, { headers: { 'x-init-data': initData() } });
     if (!res.ok) return;
     currentUser = await res.json();
-
-    const balance = currentUser.balance || 0;
-
-    document.getElementById('balance-amount').textContent = formatPrice(balance) + ' ₽';
-    document.getElementById('hero-balance').textContent = formatPrice(balance) + ' ₽';
+    const bal = currentUser.balance || 0;
+    document.getElementById('balance-amount').textContent = fmt(bal) + ' ₽';
+    document.getElementById('hero-balance').textContent = fmt(bal) + ' ₽';
     const earned = (currentUser.referral_count || 0) * 6900;
     document.getElementById('referral-stat').textContent =
-      `Купили: ${currentUser.referral_count} · Ждут: ${currentUser.referral_pending} · +${formatPrice(earned)} ₽`;
-
+      `Купили: ${currentUser.referral_count || 0} · Ждут: ${currentUser.referral_pending || 0} · +${fmt(earned)} ₽`;
   } catch {}
 }
 
-// ─── КНОПКА "ПРИГЛАСИТЬ" ────────────────────────
+// ─── ПРИГЛАСИТЬ ────────────────────────────────
 document.getElementById('ref-btn').addEventListener('click', () => {
-  if (!currentUser) return showToast('⚠ Открой через Telegram');
-  shareRefLink();
-});
-
-function shareRefLink() {
-  if (!currentUser) return;
+  if (!currentUser) return showToast('Открой через Telegram');
   const link = currentUser.referral_link;
   if (navigator.share) {
     navigator.share({ title: 'XYLIVPN', text: '🔐 Получи доступ к XYLIVPN!', url: link }).catch(() => {});
   } else {
-    navigator.clipboard.writeText(link).then(() => showToast('✅ Ссылка скопирована'));
+    navigator.clipboard.writeText(link).then(() => showToast('Ссылка скопирована'));
   }
-}
+});
 
 // ─── ТАРИФЫ ────────────────────────────────────
+const FEATURES = [
+  'Мгновенная выдача ключа',
+  'Безлимитный трафик',
+  'Все серверы включены',
+  'Любое устройство'
+];
+
 async function loadPlans() {
   const container = document.getElementById('plans-list');
   try {
@@ -172,27 +80,40 @@ async function loadPlans() {
     const plans = await res.json();
 
     if (!plans.length) {
-      container.innerHTML = '<div class="empty-state"><span class="empty-icon">⬡</span><h3>НЕТ ТАРИФОВ</h3><p>Скоро появятся новые тарифы</p></div>';
+      container.innerHTML = emptyState('📦', 'Тарифов пока нет', 'Скоро появятся новые планы');
       return;
     }
 
     container.innerHTML = '';
     plans.forEach((plan, i) => {
+      const isPopular = i === 1;
       const card = document.createElement('div');
-      card.className = 'plan-card' + (i === 1 ? ' popular' : '') + (!plan.in_stock ? ' out-of-stock' : '');
+      card.className = 'plan-card' + (isPopular ? ' popular' : '') + (!plan.in_stock ? ' out-of-stock' : '');
+
       card.innerHTML = `
+        ${isPopular ? '<div class="plan-badge">Популярное</div>' : ''}
         <div class="plan-header">
           <div class="plan-name">${plan.name}</div>
           <div class="plan-price">
-            <span class="amount">${formatPrice(plan.price)}</span>
+            <span class="amount">${fmt(plan.price)}</span>
             <span class="currency"> ₽</span>
           </div>
         </div>
         <p class="plan-desc">${plan.description}</p>
+        <div class="plan-divider"></div>
+        <div class="plan-features">
+          ${FEATURES.map(f => `
+            <div class="plan-feature">
+              <div class="plan-feature-dot">${checkSvg}</div>
+              <span>${f}</span>
+            </div>
+          `).join('')}
+        </div>
         <button class="plan-buy-btn" ${!plan.in_stock ? 'disabled' : ''} data-plan-id="${plan.id}">
-          ${plan.in_stock ? '[ КУПИТЬ ]' : '[ НЕТ В НАЛИЧИИ ]'}
+          ${plan.in_stock ? 'Получить доступ' : 'Нет в наличии'}
         </button>
       `;
+
       card.querySelector('.plan-buy-btn').addEventListener('click', (e) => {
         e.stopPropagation();
         if (plan.in_stock) openConfirmModal(plan);
@@ -200,41 +121,37 @@ async function loadPlans() {
       container.appendChild(card);
     });
   } catch {
-    container.innerHTML = `<div class="empty-state"><span class="empty-icon">⚠</span><h3>ОШИБКА СВЯЗИ</h3><p>Попробуй чуть позже</p></div>`;
+    container.innerHTML = emptyState('⚠️', 'Ошибка соединения', 'Попробуй обновить страницу');
   }
 }
 
-// ─── МОДАЛКА ПОКУПКИ ───────────────────────────
+// ─── МОДАЛКА ───────────────────────────────────
 function openConfirmModal(plan) {
   const modal = document.getElementById('modal');
   const content = document.getElementById('modal-content');
   const balance = currentUser?.balance || 0;
-  const canPayWithBalance = balance >= plan.price;
+  const canPay = balance >= plan.price;
 
   content.innerHTML = `
-    <div class="modal-title">${plan.name}</div>
-    <div class="modal-desc">${plan.description}</div>
-    <div class="modal-price-row">
-      <span class="modal-price-label">// К ОПЛАТЕ</span>
-      <span class="modal-price-value">${formatPrice(plan.price)} ₽</span>
+    <div class="m-plan-name">${plan.name}</div>
+    <div class="m-plan-desc">${plan.description}</div>
+    <div class="m-price-block">
+      <span class="m-price-label">К оплате</span>
+      <span class="m-price-value">${fmt(plan.price)} ₽</span>
     </div>
     ${balance > 0 ? `
-    <div class="modal-balance-row">
-      <span class="modal-balance-label">⚡ МОЙ БАЛАНС: ${formatPrice(balance)} ₽</span>
-      <span class="modal-balance-value">${canPayWithBalance ? 'ХВАТАЕТ' : 'НЕ ХВАТАЕТ'}</span>
+    <div class="m-balance-block">
+      <span class="left">Баланс: ${fmt(balance)} ₽</span>
+      <span class="right">${canPay ? '✓ Хватает' : 'Не хватает'}</span>
     </div>` : ''}
-    <button class="modal-confirm-btn" id="confirm-pay">
-      ${canPayWithBalance ? '[ ОПЛАТИТЬ С БАЛАНСА ]' : '[ ПЕРЕЙТИ К ОПЛАТЕ ]'}
+    <button class="m-confirm-btn" id="confirm-pay">
+      ${canPay ? 'Оплатить с баланса' : 'Перейти к оплате'}
     </button>
-    <button class="modal-cancel-btn" id="cancel-modal">// ОТМЕНА</button>
+    <button class="m-cancel-btn" id="cancel-modal">Отмена</button>
   `;
 
   modal.classList.remove('hidden');
-
-  document.getElementById('confirm-pay').addEventListener('click', () => {
-    closeModal();
-    createInvoice(plan.id);
-  });
+  document.getElementById('confirm-pay').addEventListener('click', () => { closeModal(); createInvoice(plan.id); });
   document.getElementById('cancel-modal').addEventListener('click', closeModal);
   document.querySelector('.modal-backdrop').addEventListener('click', closeModal);
 }
@@ -243,16 +160,13 @@ function closeModal() {
   document.getElementById('modal').classList.add('hidden');
 }
 
-// ─── СОЗДАТЬ СЧЁТ ──────────────────────────────
+// ─── ОПЛАТА ────────────────────────────────────
 async function createInvoice(planId) {
   const data = initData();
-  if (!data) {
-    showToast('⚠ Открой приложение через Telegram');
-    return;
-  }
+  if (!data) { showToast('Открой через Telegram'); return; }
 
   const btn = document.querySelector(`[data-plan-id="${planId}"]`);
-  if (btn) { btn.disabled = true; btn.textContent = '[ ОБРАБОТКА... ]'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Обработка...'; }
 
   try {
     const res = await fetch(`${API_URL}/api/create-invoice`, {
@@ -264,159 +178,152 @@ async function createInvoice(planId) {
 
     if (json.ok) {
       if (json.paid_with_balance) {
-        showToast('✅ Успешно оплачено с баланса');
+        showToast('✅ Оплачено с баланса!');
         await loadProfile();
       } else {
         showToast('✅ Счёт отправлен в Telegram');
         tg.close();
       }
     } else {
-      showToast('✘ ' + (json.error || 'ОШИБКА'));
-      if (btn) { btn.disabled = false; btn.textContent = '[ КУПИТЬ ]'; }
+      showToast(json.error || 'Ошибка');
+      if (btn) { btn.disabled = false; btn.textContent = 'Получить доступ'; }
     }
   } catch {
-    showToast('✘ Ошибка соединения');
-    if (btn) { btn.disabled = false; btn.textContent = '[ КУПИТЬ ]'; }
+    showToast('Ошибка соединения');
+    if (btn) { btn.disabled = false; btn.textContent = 'Получить доступ'; }
   }
 }
 
 // ─── МОИ КЛЮЧИ ─────────────────────────────────
 async function loadOrders() {
   const container = document.getElementById('orders-list');
-  container.innerHTML = '<div class="loader"><div class="spin"></div><span>Загрузка...</span></div>';
+  container.innerHTML = '<div class="loader"><div class="spin"></div></div>';
 
-  const data = initData();
-  if (!data) {
-    container.innerHTML = '<div class="empty-state"><span class="empty-icon">🔒</span><h3>ОТКРОЙ ЧЕРЕЗ TELEGRAM</h3><p>Приложение работает только внутри Telegram</p></div>';
+  if (!initData()) {
+    container.innerHTML = emptyState('🔒', 'Только в Telegram', 'Открой приложение через бота');
     return;
   }
 
   try {
-    const res = await fetch(`${API_URL}/api/orders`, { headers: { 'x-init-data': data } });
+    const res = await fetch(`${API_URL}/api/orders`, { headers: { 'x-init-data': initData() } });
     const orders = await res.json();
 
     if (!orders.length) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <span class="empty-icon">⬡</span>
-          <h3>КЛЮЧЕЙ НЕТ</h3>
-          <p>Перейди в раздел «Магазин»<br>чтобы получить ключ доступа</p>
-        </div>`;
+      container.innerHTML = emptyState('🗝', 'Ключей пока нет', 'Перейди в Магазин чтобы купить доступ');
       return;
     }
 
-    container.innerHTML = '';
-    orders.forEach(order => {
+    const wrap = document.createElement('div');
+    wrap.className = 'orders-list';
+    orders.forEach(o => {
+      const date = (o.paid_at || o.created_at)?.slice(0, 10) || '—';
       const card = document.createElement('div');
       card.className = 'order-card';
-      const date = (order.paid_at || order.created_at)?.slice(0, 10) || '—';
-
       card.innerHTML = `
         <div class="order-header">
-          <div class="order-plan">${order.plan_name}</div>
-          <div class="order-status ${order.status === 'paid' ? 'status-paid' : 'status-pending'}">
-            ${order.status === 'paid' ? '● АКТИВЕН' : '○ ОЖИДАЕТ ОПЛАТЫ'}
+          <div class="order-plan">${o.plan_name}</div>
+          <div class="status-badge ${o.status === 'paid' ? 'status-paid' : 'status-pending'}">
+            ${o.status === 'paid' ? 'Активен' : 'Ожидает'}
           </div>
         </div>
-        ${order.key_value ? `
+        ${o.key_value ? `
           <div class="order-key">
-            <div class="key-value">${order.key_value}</div>
-            <button class="copy-btn" data-key="${order.key_value}" title="Скопировать ключ">⧉</button>
+            <div class="key-value">${o.key_value}</div>
+            <button class="copy-btn" data-key="${o.key_value}">Копировать</button>
           </div>
         ` : ''}
-        <div class="order-date">// Дата: ${date}</div>
+        <div class="order-date">${date}</div>
       `;
-
       const copyBtn = card.querySelector('.copy-btn');
       if (copyBtn) {
         copyBtn.addEventListener('click', () => {
           navigator.clipboard.writeText(copyBtn.dataset.key).then(() => {
-            showToast('✅ Ключ скопирован');
-            copyBtn.textContent = '✓';
-            setTimeout(() => { copyBtn.textContent = '⧉'; }, 1500);
+            showToast('Ключ скопирован');
+            copyBtn.textContent = 'Скопировано';
+            setTimeout(() => { copyBtn.textContent = 'Копировать'; }, 1500);
           });
         });
       }
-
-      container.appendChild(card);
+      wrap.appendChild(card);
     });
+    container.innerHTML = '';
+    container.appendChild(wrap);
   } catch {
-    container.innerHTML = '<div class="empty-state"><span class="empty-icon">⚠</span><h3>ОШИБКА СВЯЗИ</h3><p>Не удалось загрузить данные. Попробуй позже</p></div>';
+    container.innerHTML = emptyState('⚠️', 'Ошибка загрузки', 'Попробуй позже');
   }
 }
 
-// ─── СТРАНИЦА РЕФЕРАЛОВ ─────────────────────────
+// ─── РЕФЕРАЛЫ ──────────────────────────────────
 function loadReferralPage() {
   const container = document.getElementById('referral-page');
   if (!currentUser) {
-    container.innerHTML = '<div class="empty-state"><span class="empty-icon">🔒</span><h3>ОТКРОЙ ЧЕРЕЗ TELEGRAM</h3><p>Приложение работает только внутри Telegram</p></div>';
+    container.innerHTML = emptyState('🔒', 'Только в Telegram', 'Открой приложение через бота');
     return;
   }
 
-  const { referral_count, referral_pending, referral_link } = currentUser;
-  const earned = (referral_count || 0) * 6900;
+  const { referral_count = 0, referral_pending = 0, referral_link } = currentUser;
+  const earned = referral_count * 6900;
 
   container.innerHTML = `
-    <div class="ref-hero">
-      <span class="ref-hero-icon">👥</span>
-      <div class="ref-hero-title">РЕФЕРАЛЬНАЯ ПРОГРАММА</div>
-      <div class="ref-hero-sub">Приглашай друзей — получай бонусы на баланс</div>
-      <div class="ref-bonus-badge">+69 ₽ за друга</div>
-      <div class="ref-hero-sub">Бонус зачисляется после того, как друг <b>оформит подписку</b></div>
+    <div class="ref-hero-card">
+      <span class="ref-emoji">👥</span>
+      <div class="ref-title">Реферальная программа</div>
+      <div class="ref-subtitle">Приглашай друзей и получай бонусы на баланс за каждую их подписку</div>
+      <div class="ref-bonus-pill">+69 ₽ за друга</div>
     </div>
 
-    <div class="ref-stats-row">
-      <div class="ref-stat-card">
-        <div class="ref-stat-label">// ОФОРМИЛИ ПОДПИСКУ</div>
-        <div class="ref-stat-value cyan">${referral_count || 0}</div>
+    <div class="ref-stats-grid">
+      <div class="ref-stat">
+        <div class="ref-stat-label">Купили</div>
+        <div class="ref-stat-val purple">${referral_count}</div>
       </div>
-      <div class="ref-stat-card">
-        <div class="ref-stat-label">// ЕЩЁ НЕ КУПИЛИ</div>
-        <div class="ref-stat-value" style="color:var(--yellow)">${referral_pending || 0}</div>
+      <div class="ref-stat">
+        <div class="ref-stat-label">Ожидают</div>
+        <div class="ref-stat-val amber">${referral_pending}</div>
       </div>
-    </div>
-    <div class="ref-stats-row" style="margin-top:10px">
-      <div class="ref-stat-card" style="grid-column:1/-1">
-        <div class="ref-stat-label">// ИТОГО ЗАРАБОТАНО</div>
-        <div class="ref-stat-value green">${formatPrice(earned)} ₽</div>
+      <div class="ref-stat full">
+        <div class="ref-stat-label">Заработано</div>
+        <div class="ref-stat-val green">${fmt(earned)} ₽</div>
       </div>
     </div>
 
-    <div class="ref-link-block">
-      <div class="ref-link-label">// ТВОЯ РЕФЕРАЛЬНАЯ ССЫЛКА</div>
-      <div class="ref-link-box">${referral_link}</div>
-      <button class="ref-copy-btn" id="copy-ref-link">[ СКОПИРОВАТЬ ССЫЛКУ ]</button>
+    <div class="ref-link-card">
+      <div class="ref-link-label">Твоя ссылка</div>
+      <div class="ref-link-value">${referral_link}</div>
+      <button class="ref-copy-btn" id="copy-ref">Скопировать ссылку</button>
     </div>
 
-    <div class="ref-how-list">
-      <div class="ref-how-title">// КАК ЭТО РАБОТАЕТ</div>
-      <div class="ref-how-item">
-        <div class="ref-how-num">1</div>
-        <div class="ref-how-text">Скопируй свою реферальную ссылку и отправь другу</div>
-      </div>
-      <div class="ref-how-item">
-        <div class="ref-how-num">2</div>
-        <div class="ref-how-text">Друг переходит по ссылке и запускает бота</div>
-      </div>
-      <div class="ref-how-item">
-        <div class="ref-how-num">3</div>
-        <div class="ref-how-text">Как только друг оформит подписку — тебе начислится +69 ₽</div>
-      </div>
-      <div class="ref-how-item">
-        <div class="ref-how-num">4</div>
-        <div class="ref-how-text">Используй накопленный баланс для оплаты своих ключей</div>
-      </div>
+    <div class="how-card">
+      <div class="how-title">Как это работает</div>
+      ${[
+        'Скопируй реферальную ссылку и отправь другу',
+        'Друг переходит по ссылке и запускает бота',
+        'После оформления подписки тебе приходит +69 ₽',
+        'Трать баланс на оплату своих ключей'
+      ].map((t, i) => `
+        <div class="how-item">
+          <div class="how-num">${i + 1}</div>
+          <div class="how-text">${t}</div>
+        </div>
+      `).join('')}
     </div>
   `;
 
-  document.getElementById('copy-ref-link').addEventListener('click', () => {
-    navigator.clipboard.writeText(referral_link).then(() => {
-      showToast('✅ Ссылка скопирована');
-    });
+  document.getElementById('copy-ref').addEventListener('click', () => {
+    navigator.clipboard.writeText(referral_link).then(() => showToast('Ссылка скопирована'));
   });
 }
 
-// ─── ИНИЦИАЛИЗАЦИЯ ──────────────────────────────
+// ─── EMPTY STATE ───────────────────────────────
+function emptyState(icon, title, sub) {
+  return `<div class="empty-state">
+    <span class="empty-icon">${icon}</span>
+    <div class="empty-title">${title}</div>
+    <div class="empty-sub">${sub}</div>
+  </div>`;
+}
+
+// ─── INIT ───────────────────────────────────────
 async function init() {
   await loadProfile();
   loadPlans();
