@@ -2,9 +2,100 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const API_URL = 'https://292a1b359850bb.lhr.life';
+const API_URL = 'https://da688eb004e51c.lhr.life';
 
 let currentUser = null;
+
+// ─── CANVAS АНИМАЦИЯ ───────────────────────────
+(function initCanvas() {
+  const canvas = document.getElementById('bg-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  let W, H, nodes, animId;
+
+  const NODE_COUNT = 55;
+  const MAX_DIST = 140;
+  const NODE_RADIUS = 1.8;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function makeNode() {
+    return {
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: NODE_RADIUS + Math.random() * 1.2
+    };
+  }
+
+  function initNodes() {
+    nodes = Array.from({ length: NODE_COUNT }, makeNode);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // рёбра
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[i].x - nodes[j].x;
+        const dy = nodes[i].y - nodes[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MAX_DIST) {
+          const alpha = (1 - dist / MAX_DIST) * 0.35;
+          ctx.strokeStyle = `rgba(99,179,237,${alpha})`;
+          ctx.lineWidth = 0.6;
+          ctx.beginPath();
+          ctx.moveTo(nodes[i].x, nodes[i].y);
+          ctx.lineTo(nodes[j].x, nodes[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // узлы
+    nodes.forEach(n => {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(99,179,237,0.55)';
+      ctx.shadowColor = '#63b3ed';
+      ctx.shadowBlur = 6;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    });
+  }
+
+  function update() {
+    nodes.forEach(n => {
+      n.x += n.vx;
+      n.y += n.vy;
+      if (n.x < 0 || n.x > W) n.vx *= -1;
+      if (n.y < 0 || n.y > H) n.vy *= -1;
+    });
+  }
+
+  function loop() {
+    update();
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+
+  resize();
+  initNodes();
+  loop();
+
+  window.addEventListener('resize', () => {
+    cancelAnimationFrame(animId);
+    resize();
+    initNodes();
+    loop();
+  });
+})();
 
 // ─── ТАБЫ ──────────────────────────────────────
 document.querySelectorAll('.tab').forEach(btn => {
@@ -48,10 +139,7 @@ async function loadProfile() {
 
     const balance = currentUser.balance || 0;
 
-    // Шапка
     document.getElementById('balance-amount').textContent = formatPrice(balance) + ' ₽';
-
-    // Hero блок
     document.getElementById('hero-balance').textContent = formatPrice(balance) + ' ₽';
     const earned = (currentUser.referral_count || 0) * 6900;
     document.getElementById('referral-stat').textContent =
@@ -148,7 +236,7 @@ function openConfirmModal(plan) {
     createInvoice(plan.id);
   });
   document.getElementById('cancel-modal').addEventListener('click', closeModal);
-  document.querySelector('.modal-overlay').addEventListener('click', closeModal);
+  document.querySelector('.modal-backdrop').addEventListener('click', closeModal);
 }
 
 function closeModal() {
@@ -165,7 +253,6 @@ async function createInvoice(planId) {
 
   const btn = document.querySelector(`[data-plan-id="${planId}"]`);
   if (btn) { btn.disabled = true; btn.textContent = '[ ОБРАБОТКА... ]'; }
-
 
   try {
     const res = await fetch(`${API_URL}/api/create-invoice`, {
@@ -196,7 +283,7 @@ async function createInvoice(planId) {
 // ─── МОИ КЛЮЧИ ─────────────────────────────────
 async function loadOrders() {
   const container = document.getElementById('orders-list');
-  container.innerHTML = '<div class="loading"><div class="cyber-spinner"></div><p class="loading-text">ЗАГРУЗКА_ДАННЫХ...</p></div>';
+  container.innerHTML = '<div class="loader"><div class="spin"></div><span>Загрузка...</span></div>';
 
   const data = initData();
   if (!data) {
