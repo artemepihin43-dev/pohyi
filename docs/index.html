@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>XYLIVPN</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanlines"></div>
+  <div class="noise"></div>
+
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <span class="logo-icon">⬡</span>
+        <div class="logo-text">
+          <h1>XYLI<span class="accent">VPN</span></h1>
+          <p class="tagline">[ ЗАЩИТА_АКТИВНА ]</p>
+        </div>
+      </div>
+      <div class="header-balance" id="header-balance">
+        <span class="balance-label">БАЛАНС</span>
+        <span class="balance-amount" id="balance-amount">-- ₽</span>
+      </div>
+    </header>
+
+    <!-- Balance + referral block -->
+    <div class="hero-block">
+      <div class="hero-balance">
+        <div class="hero-balance-inner">
+          <div class="hero-bal-label">// БАЛАНС АККАУНТА</div>
+          <div class="hero-bal-amount" id="hero-balance">0.00 ₽</div>
+          <div class="hero-bal-sub" id="referral-stat">Рефералов: 0 · Заработано: 0 ₽</div>
+        </div>
+        <button class="ref-btn" id="ref-btn">
+          <span>👥</span> ПРИГЛАСИТЬ
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="shop">// МАГАЗИН</button>
+      <button class="tab" data-tab="mykeys">// МОИ КЛЮЧИ</button>
+      <button class="tab" data-tab="referral">// РЕФЕРАЛЫ</button>
+    </nav>
+
+    <!-- МАГАЗИН -->
+    <section id="tab-shop" class="tab-content active">
+      <div class="features-strip">
+        <div class="feat">⚡ МГНОВЕННО</div>
+        <div class="feat-sep">|</div>
+        <div class="feat">♾ БЕЗЛИМИТ</div>
+        <div class="feat-sep">|</div>
+        <div class="feat">🌍 ВЕЗДЕ</div>
+        <div class="feat-sep">|</div>
+        <div class="feat">🔒 ШИФРОВАНИЕ</div>
+      </div>
+
+      <div id="plans-list" class="plans-list">
+        <div class="loading">
+          <div class="cyber-spinner"></div>
+          <p class="loading-text">ЗАГРУЗКА_ТАРИФОВ...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- МОИ КЛЮЧИ -->
+    <section id="tab-mykeys" class="tab-content">
+      <div id="orders-list" class="orders-list">
+        <div class="loading">
+          <div class="cyber-spinner"></div>
+          <p class="loading-text">ЗАГРУЗКА...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- РЕФЕРАЛЫ -->
+    <section id="tab-referral" class="tab-content">
+      <div class="referral-page" id="referral-page">
+        <div class="loading">
+          <div class="cyber-spinner"></div>
+          <p class="loading-text">ЗАГРУЗКА...</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-box">
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
