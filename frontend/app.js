@@ -53,8 +53,9 @@ async function loadProfile() {
 
     // Hero блок
     document.getElementById('hero-balance').textContent = formatPrice(balance) + ' ₽';
+    const earned = (currentUser.referral_count || 0) * 6900;
     document.getElementById('referral-stat').textContent =
-      `Рефералов: ${currentUser.referral_count} · Заработано: ${formatPrice(currentUser.referral_count * 6900)} ₽`;
+      `Купили: ${currentUser.referral_count} · Ждут: ${currentUser.referral_pending} · +${formatPrice(earned)} ₽`;
 
   } catch {}
 }
@@ -264,8 +265,8 @@ function loadReferralPage() {
     return;
   }
 
-  const { referral_count, referral_link, balance } = currentUser;
-  const earned = referral_count * 6900;
+  const { referral_count, referral_pending, referral_link } = currentUser;
+  const earned = (referral_count || 0) * 6900;
 
   container.innerHTML = `
     <div class="ref-hero">
@@ -273,15 +274,21 @@ function loadReferralPage() {
       <div class="ref-hero-title">РЕФЕРАЛЬНАЯ ПРОГРАММА</div>
       <div class="ref-hero-sub">Приглашай друзей — получай бонусы на баланс</div>
       <div class="ref-bonus-badge">+69 ₽ за друга</div>
-      <div class="ref-hero-sub">Бонус зачисляется мгновенно после регистрации друга</div>
+      <div class="ref-hero-sub">Бонус зачисляется после того как друг <b>оформит подписку</b></div>
     </div>
 
     <div class="ref-stats-row">
       <div class="ref-stat-card">
-        <div class="ref-stat-label">// ПРИГЛАШЕНО</div>
-        <div class="ref-stat-value cyan">${referral_count}</div>
+        <div class="ref-stat-label">// КУПИЛИ</div>
+        <div class="ref-stat-value cyan">${referral_count || 0}</div>
       </div>
       <div class="ref-stat-card">
+        <div class="ref-stat-label">// ЖДУТ ПОКУПКИ</div>
+        <div class="ref-stat-value" style="color:var(--yellow)">${referral_pending || 0}</div>
+      </div>
+    </div>
+    <div class="ref-stats-row" style="margin-top:10px">
+      <div class="ref-stat-card" style="grid-column:1/-1">
         <div class="ref-stat-label">// ЗАРАБОТАНО</div>
         <div class="ref-stat-value green">${formatPrice(earned)} ₽</div>
       </div>

@@ -31,6 +31,33 @@ function getOrCreateUser(tgUser) {
   return db.get('users').find({ telegram_id: tgUser.id }).value();
 }
 
+// Вызывается после успешной оплаты — начисляет бонус рефереру если ещё не начислен
+function tryPayReferralBonus(paidUserId) {
+  const referral = db.get('referrals').find({ referred_id: paidUserId, status: 'pending' }).value();
+  if (!referral) return;
+
+  const referrer = db.get('users').find({ telegram_id: referral.referrer_id }).value();
+  if (!referrer) return;
+
+  // Начисляем бонус
+  db.get('users').find({ telegram_id: referral.referrer_id })
+    .assign({ balance: (referrer.balance || 0) + REFERRAL_BONUS })
+    .write();
+
+  // Помечаем реферала как оплаченного
+  db.get('referrals').find({ id: referral.id })
+    .assign({ status: 'paid', paid_at: new Date().toISOString() })
+    .write();
+
+  // Уведомляем реферера
+  bot.sendMessage(referral.referrer_id,
+    `🎉 *+69 ₽ на баланс!*\n\n` +
+    `Твой приглашённый друг оформил подписку.\n` +
+    `Бонус зачислен на твой счёт! 🔥`,
+    { parse_mode: 'Markdown' }
+  ).catch(() => {});
+}
+
 // /start — с поддержкой реферального кода
 bot.onText(/\/start(?:\s+(.+))?/, (msg, match) => {
   const chatId = msg.chat.id;
@@ -40,35 +67,22 @@ bot.onText(/\/start(?:\s+(.+))?/, (msg, match) => {
   const isNew = !db.get('users').find({ telegram_id: tgUser.id }).value();
   const user = getOrCreateUser(tgUser);
 
-  // Начислить реферальный бонус
+  // При первом запуске сохраняем реферала (статус pending — бонус ещё не начислен)
   if (isNew && refCode && refCode.startsWith('ref')) {
     const referrerId = parseInt(refCode.replace('ref', ''));
     const referrer = db.get('users').find({ telegram_id: referrerId }).value();
+    const alreadyReferred = db.get('referrals').find({ referred_id: tgUser.id }).value();
 
-    if (referrer && referrerId !== tgUser.id) {
-      // Проверяем что этот пользователь ещё не был реферален
-      const alreadyReferred = db.get('referrals').find({ referred_id: tgUser.id }).value();
-      if (!alreadyReferred) {
-        db.get('referrals').push({
-          id: Date.now(),
-          referrer_id: referrerId,
-          referred_id: tgUser.id,
-          bonus: REFERRAL_BONUS,
-          created_at: new Date().toISOString()
-        }).write();
-
-        db.get('users').find({ telegram_id: referrerId }).assign({
-          balance: (referrer.balance || 0) + REFERRAL_BONUS
-        }).write();
-
-        // Уведомить реферера
-        bot.sendMessage(referrerId,
-          `🎉 *+69 ₽ на баланс!*\n\n` +
-          `По твоей реферальной ссылке зарегистрировался новый пользователь.\n` +
-          `Бонус зачислен на твой счёт. 🔥`,
-          { parse_mode: 'Markdown' }
-        ).catch(() => {});
-      }
+    if (referrer && referrerId !== tgUser.id && !alreadyReferred) {
+      db.get('referrals').push({
+        id: Date.now(),
+        referrer_id: referrerId,
+        referred_id: tgUser.id,
+        bonus: REFERRAL_BONUS,
+        status: 'pending', // бонус начислим только после оплаты
+        created_at: new Date().toISOString(),
+        paid_at: null
+      }).write();
     }
   }
 
@@ -122,9 +136,8 @@ bot.onText(/\/mykeys/, (msg) => {
 // /balance
 bot.onText(/\/balance/, (msg) => {
   const user = db.get('users').find({ telegram_id: msg.from.id }).value();
-  const balance = user?.balance || 0;
   bot.sendMessage(msg.chat.id,
-    `💰 *Твой баланс:* ${(balance / 100).toFixed(2)} ₽`,
+    `💰 *Твой баланс:* ${((user?.balance || 0) / 100).toFixed(2)} ₽`,
     { parse_mode: 'Markdown' }
   );
 });
@@ -132,14 +145,17 @@ bot.onText(/\/balance/, (msg) => {
 // /ref
 bot.onText(/\/ref/, (msg) => {
   const user = getOrCreateUser(msg.from);
-  const refLink = `https://t.me/${process.env.BOT_USERNAME || 'your_bot'}?start=${user.ref_code}`;
-  const refCount = db.get('referrals').filter({ referrer_id: msg.from.id }).size().value();
-  const earned = refCount * REFERRAL_BONUS;
+  const refLink = `https://t.me/${process.env.BOT_USERNAME || 'vpnxyliBot'}?start=${user.ref_code}`;
+  const allReferrals = db.get('referrals').filter({ referrer_id: msg.from.id }).value();
+  const paidReferrals = allReferrals.filter(r => r.status === 'paid').length;
+  const pendingReferrals = allReferrals.filter(r => r.status === 'pending').length;
+  const earned = paidReferrals * REFERRAL_BONUS;
 
   bot.sendMessage(msg.chat.id,
     `👥 *Реферальная программа*\n\n` +
-    `За каждого приглашённого друга ты получаешь *+69 ₽* на баланс.\n\n` +
-    `📊 Приглашено: *${refCount}* чел.\n` +
+    `За каждого друга, который *оформил подписку*, ты получаешь *+69 ₽* на баланс.\n\n` +
+    `📊 Оформили подписку: *${paidReferrals}* чел.\n` +
+    `⏳ Зарегистрировались (ещё не купили): *${pendingReferrals}* чел.\n` +
     `💰 Заработано: *${(earned / 100).toFixed(2)} ₽*\n\n` +
     `🔗 Твоя ссылка:\n\`${refLink}\``,
     { parse_mode: 'Markdown' }
@@ -171,7 +187,8 @@ bot.onText(/\/admin/, (msg) => {
     `💳 Продаж: *${paidOrders.length}*\n` +
     `💰 Выручка: *${(revenue / 100).toFixed(2)} ₽*\n` +
     `👥 Пользователей: *${db.get('users').size().value()}*\n` +
-    `🔗 Рефералов: *${db.get('referrals').size().value()}*`,
+    `🔗 Рефералов оплачено: *${db.get('referrals').filter({ status: 'paid' }).size().value()}*\n` +
+    `⏳ Рефералов ожидает: *${db.get('referrals').filter({ status: 'pending' }).size().value()}*`,
     { parse_mode: 'Markdown' }
   );
 });
@@ -203,15 +220,17 @@ bot.on('callback_query', (query) => {
   if (query.data === 'referrals') {
     bot.answerCallbackQuery(query.id);
     const user = getOrCreateUser(query.from);
-    const refLink = `https://t.me/${process.env.BOT_USERNAME || 'your_bot'}?start=${user.ref_code}`;
-    const refCount = db.get('referrals').filter({ referrer_id: query.from.id }).size().value();
-    const earned = refCount * REFERRAL_BONUS;
+    const refLink = `https://t.me/${process.env.BOT_USERNAME || 'vpnxyliBot'}?start=${user.ref_code}`;
+    const allReferrals = db.get('referrals').filter({ referrer_id: query.from.id }).value();
+    const paidCount = allReferrals.filter(r => r.status === 'paid').length;
+    const pendingCount = allReferrals.filter(r => r.status === 'pending').length;
 
     bot.sendMessage(chatId,
       `👥 *Реферальная программа*\n\n` +
-      `За каждого друга — *+69 ₽* на баланс.\n\n` +
-      `📊 Приглашено: *${refCount}* чел.\n` +
-      `💰 Заработано: *${(earned / 100).toFixed(2)} ₽*\n\n` +
+      `За каждого друга, который *оформил подписку* — *+69 ₽* на баланс.\n\n` +
+      `✅ Оформили подписку: *${paidCount}* чел.\n` +
+      `⏳ Ещё не купили: *${pendingCount}* чел.\n` +
+      `💰 Заработано: *${(paidCount * REFERRAL_BONUS / 100).toFixed(2)} ₽*\n\n` +
       `🔗 Твоя ссылка:\n\`${refLink}\``,
       { parse_mode: 'Markdown' }
     );
@@ -221,10 +240,6 @@ bot.on('callback_query', (query) => {
     bot.answerCallbackQuery(query.id);
     bot.sendMessage(chatId,
       `❓ *Помощь*\n\n` +
-      `*Как подключиться к VPN?*\n` +
-      `1. Купи ключ в магазине\n` +
-      `2. Получи ключ в этом чате\n` +
-      `3. Введи ключ в VPN-клиент\n\n` +
       `*Команды:*\n` +
       `/start — главное меню\n` +
       `/mykeys — мои ключи\n` +
@@ -264,8 +279,10 @@ bot.on('successful_payment', (msg) => {
     }).write();
   }
 
-  const plan = db.get('plans').find({ id: planId }).value();
+  // Начисляем бонус рефереру если это первая покупка приведённого пользователя
+  tryPayReferralBonus(userId);
 
+  const plan = db.get('plans').find({ id: planId }).value();
   bot.sendMessage(msg.chat.id,
     `✅ *Оплата прошла!*\n\n` +
     `📦 Тариф: *${plan?.name}*\n\n` +
@@ -275,4 +292,4 @@ bot.on('successful_payment', (msg) => {
   );
 });
 
-module.exports = bot;
+module.exports = { bot, tryPayReferralBonus };

@@ -4,7 +4,7 @@ const cors = require('cors');
 const crypto = require('crypto');
 const db = require('./database');
 const { addBulkKeys, getAvailableKey, markKeyUsed } = require('./keys');
-const bot = require('./bot');
+const { bot, tryPayReferralBonus } = require('./bot');
 
 const app = express();
 app.use(cors());
@@ -63,8 +63,10 @@ app.get('/api/me', (req, res) => {
   if (!tgUser) return res.status(401).json({ error: 'Unauthorized' });
 
   const user = getOrCreateUser(tgUser);
-  const referralCount = db.get('referrals').filter({ referrer_id: user.telegram_id }).size().value();
-  const referralLink = `https://t.me/${process.env.BOT_USERNAME || 'your_bot'}?start=${user.ref_code}`;
+  const allReferrals = db.get('referrals').filter({ referrer_id: user.telegram_id }).value();
+  const paidReferrals   = allReferrals.filter(r => r.status === 'paid').length;
+  const pendingReferrals = allReferrals.filter(r => r.status === 'pending').length;
+  const referralLink = `https://t.me/${process.env.BOT_USERNAME || 'vpnxyliBot'}?start=${user.ref_code}`;
 
   res.json({
     first_name: user.first_name,
@@ -72,7 +74,8 @@ app.get('/api/me', (req, res) => {
     balance: user.balance,
     ref_code: user.ref_code,
     referral_link: referralLink,
-    referral_count: referralCount
+    referral_count: paidReferrals,
+    referral_pending: pendingReferrals
   });
 });
 
@@ -133,6 +136,9 @@ app.post('/api/create-invoice', (req, res) => {
       `📋 Сохрани ключ — он нужен для подключения к серверу.`,
       { parse_mode: 'Markdown' }
     ).catch(() => {});
+
+    // Начисляем бонус рефереру если это первая покупка
+    tryPayReferralBonus(tgUser.id);
 
     return res.json({ ok: true, paid_with_balance: true });
   }
