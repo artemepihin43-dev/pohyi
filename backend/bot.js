@@ -2,7 +2,9 @@ const TelegramBot = require('node-telegram-bot-api');
 const db = require('./database');
 const { getAvailableKey, markKeyUsed } = require('./keys');
 
-const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
+// На Railway используем webhook, локально — polling
+const IS_PROD = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.WEBHOOK_URL;
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: !IS_PROD });
 
 function addLog(type, userId, username, action, details = '') {
   try {

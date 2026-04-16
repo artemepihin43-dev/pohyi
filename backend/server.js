@@ -14,6 +14,12 @@ app.use(express.json());
 // Health check (Railway/Render используют для проверки)
 app.get('/', (req, res) => res.json({ ok: true, service: 'xylivpn-backend' }));
 
+// Webhook для Telegram бота
+app.post(`/webhook/${process.env.BOT_TOKEN}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
 // Отдаём admin панель
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
@@ -381,9 +387,25 @@ app.post('/api/admin/broadcast', adminAuth, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`✅ Сервер запущен на порту ${PORT}`);
-  console.log(`🤖 Бот запущен`);
+
+  // Если Railway — устанавливаем webhook
+  const railwayUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : process.env.WEBHOOK_URL;
+
+  if (railwayUrl && process.env.BOT_TOKEN) {
+    const webhookUrl = `${railwayUrl}/webhook/${process.env.BOT_TOKEN}`;
+    try {
+      await bot.setWebHook(webhookUrl);
+      console.log(`🔗 Webhook установлен: ${webhookUrl}`);
+    } catch (e) {
+      console.error('Webhook error:', e.message);
+    }
+  } else {
+    console.log(`🤖 Бот запущен (polling)`);
+  }
 });
 
 module.exports = { REFERRAL_BONUS };
