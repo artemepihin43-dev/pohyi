@@ -1,0 +1,4 @@
+backend/.env
+backend/vpn_keys.db
+node_modules/
+backend/node_modules/
