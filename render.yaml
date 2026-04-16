@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: xylivpn-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: BOT_USERNAME
+        value: vpnxyliBot
+      - key: PAYMENT_PROVIDER_TOKEN
+        sync: false
+      - key: ADMIN_TELEGRAM_ID
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: WEB_APP_URL
+        value: https://artemepihin43-dev.github.io/pohyi/
+      - key: PORT
+        value: 3000
