@@ -2,7 +2,7 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const API_URL = 'https://da688eb004e51c.lhr.life';
+const API_URL = 'https://xylivpn-backend-production.up.railway.app';
 
 let currentUser = null;
 
