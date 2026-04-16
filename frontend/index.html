@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>VPN Shop</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="logo">
+        <span class="logo-icon">🔐</span>
+        <div>
+          <h1>VPN Shop</h1>
+          <p>Безопасный интернет везде</p>
+        </div>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="shop">Магазин</button>
+      <button class="tab" data-tab="mykeys">Мои ключи</button>
+    </nav>
+
+    <!-- Shop tab -->
+    <section id="tab-shop" class="tab-content active">
+      <div class="features">
+        <div class="feature"><span>⚡</span> Мгновенная выдача</div>
+        <div class="feature"><span>♾️</span> Безлимит</div>
+        <div class="feature"><span>🌍</span> Работает везде</div>
+      </div>
+
+      <div id="plans-list" class="plans-list">
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>Загрузка тарифов...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- My keys tab -->
+    <section id="tab-mykeys" class="tab-content">
+      <div id="orders-list" class="orders-list">
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>Загрузка...</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-box">
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
