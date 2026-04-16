@@ -22,22 +22,30 @@ bot.onText(/\/start/, (msg) => {
   `).run(user.id, user.username || null, user.first_name || null, user.last_name || null);
 
   bot.sendMessage(chatId,
-    `👋 Привет, ${user.first_name || 'друг'}!\n\n` +
-    `🔐 *VPN Shop* — купи ключ доступа к нашему VPN-серверу.\n\n` +
-    `✅ Стабильное соединение\n` +
-    `✅ Безлимитный трафик\n` +
-    `✅ Работает везде\n` +
-    `✅ Мгновенная выдача ключа\n\n` +
-    `Нажми кнопку ниже, чтобы открыть магазин:`,
+    `👋 Привет, *${user.first_name || 'друг'}*!\n\n` +
+    `Добро пожаловать в *VPN Shop* — твой личный доступ к защищённому интернету.\n\n` +
+    `🌐 Обходи блокировки\n` +
+    `🔒 Защита трафика\n` +
+    `⚡ Высокая скорость\n` +
+    `♾️ Безлимитный трафик\n` +
+    `📱 Работает на любом устройстве\n` +
+    `⚙️ Мгновенная выдача ключа после оплаты\n\n` +
+    `👇 Нажми кнопку ниже чтобы выбрать тариф:`,
     {
       parse_mode: 'Markdown',
       reply_markup: {
-        inline_keyboard: [[
-          {
-            text: '🛒 Открыть магазин',
-            web_app: { url: WEB_APP_URL }
-          }
-        ]]
+        inline_keyboard: [
+          [
+            {
+              text: '🛒 Открыть магазин',
+              web_app: { url: WEB_APP_URL }
+            }
+          ],
+          [
+            { text: '🔑 Мои ключи', callback_data: 'my_keys' },
+            { text: '❓ Помощь', callback_data: 'help' }
+          ]
+        ]
       }
     }
   );
@@ -103,10 +111,62 @@ bot.onText(/\/admin/, (msg) => {
 });
 
 bot.on('callback_query', (query) => {
-  if (String(query.from.id) !== String(process.env.ADMIN_TELEGRAM_ID)) return;
-  if (query.data === 'admin_add_keys') {
+  const chatId = query.message.chat.id;
+
+  if (query.data === 'my_keys') {
     bot.answerCallbackQuery(query.id);
-    bot.sendMessage(query.message.chat.id,
+    const orders = db.prepare(`
+      SELECT o.*, k.key_value, p.name as plan_name
+      FROM orders o
+      LEFT JOIN vpn_keys k ON k.id = o.vpn_key_id
+      LEFT JOIN plans p ON p.id = o.plan_id
+      WHERE o.telegram_user_id = ? AND o.status = 'paid'
+      ORDER BY o.paid_at DESC LIMIT 10
+    `).all(query.from.id);
+
+    if (!orders.length) {
+      return bot.sendMessage(chatId,
+        '🔑 У тебя пока нет купленных ключей.\n\nОткрой магазин чтобы выбрать тариф.',
+        {
+          reply_markup: {
+            inline_keyboard: [[
+              { text: '🛒 В магазин', web_app: { url: process.env.WEB_APP_URL || 'https://your-domain.com' } }
+            ]]
+          }
+        }
+      );
+    }
+
+    let text = '🔑 *Твои VPN ключи:*\n\n';
+    orders.forEach((o, i) => {
+      text += `*${i + 1}. ${o.plan_name}*\n`;
+      text += `\`${o.key_value}\`\n`;
+      text += `📅 ${o.paid_at?.slice(0, 10)}\n\n`;
+    });
+    bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+  }
+
+  if (query.data === 'help') {
+    bot.answerCallbackQuery(query.id);
+    bot.sendMessage(chatId,
+      `❓ *Помощь*\n\n` +
+      `*Как подключиться к VPN?*\n` +
+      `1. Купи ключ в магазине\n` +
+      `2. Получи ключ в этом чате\n` +
+      `3. Введи ключ в VPN-клиент\n\n` +
+      `*Команды:*\n` +
+      `/start — главное меню\n` +
+      `/mykeys — мои ключи\n\n` +
+      `*Проблемы с ключом?*\n` +
+      `Напиши нам — разберёмся!`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  if (query.data === 'admin_add_keys') {
+    if (String(query.from.id) !== String(process.env.ADMIN_TELEGRAM_ID)) return;
+    bot.answerCallbackQuery(query.id);
+    bot.sendMessage(chatId,
       'Используй API эндпоинт для добавления ключей:\n\n' +
       '`POST /api/admin/keys`\n' +
       '```json\n{"planId": 1, "count": 10}\n```\n' +
