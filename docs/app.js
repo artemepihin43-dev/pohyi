@@ -2,7 +2,7 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const API_URL = 'https://nervous-sheep-84.loca.lt';
+const API_URL = 'https://wonderful-grasshopper-51.loca.lt';
 
 let currentUser = null;
 
