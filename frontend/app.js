@@ -6,12 +6,19 @@ const API_URL = 'https://4f929649295208.lhr.life';
 
 let currentUser = null;
 
-// Показываем вкладку Админ сразу если Telegram сообщает наш ID
+// Показываем вкладку Админ
 const ADMIN_TG_ID = 6807012532;
-if (tg.initDataUnsafe?.user?.id === ADMIN_TG_ID) {
-  const _adminTab = document.getElementById('tab-btn-admin');
-  if (_adminTab) _adminTab.style.display = '';
+function tryShowAdminTab() {
+  const uid = tg.initDataUnsafe?.user?.id;
+  if (Number(uid) === ADMIN_TG_ID) {
+    const tab = document.getElementById('tab-btn-admin');
+    if (tab) { tab.style.display = ''; tab.style.removeProperty('display'); tab.removeAttribute('style'); tab.style.display = 'flex'; }
+    return true;
+  }
+  return false;
 }
+tryShowAdminTab();
+setTimeout(tryShowAdminTab, 300);
 
 // ─── ТАБЫ ──────────────────────────────────────
 document.querySelectorAll('.tab').forEach(btn => {
