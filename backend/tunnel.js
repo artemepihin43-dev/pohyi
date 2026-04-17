@@ -1,7 +1,7 @@
 // Автоматический туннель через localhost.run
 // Запускается через PM2, при падении перезапускается автоматически
 
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -19,6 +19,20 @@ function updateApiUrl(newUrl) {
     fs.writeFileSync(file, content, 'utf8');
   });
   console.log(`[tunnel] API_URL обновлён: ${newUrl}`);
+
+  // Пушим на GitHub Pages
+  try {
+    const root = path.join(__dirname, '..');
+    execSync('git add frontend/app.js', { cwd: root, stdio: 'pipe' });
+    execSync(`git commit -m "tunnel: update API_URL to ${newUrl}"`, { cwd: root, stdio: 'pipe' });
+    execSync('git push origin main', { cwd: root, stdio: 'pipe' });
+    console.log(`[tunnel] GitHub Pages обновлён`);
+  } catch (e) {
+    // Если нечего коммитить — это нормально
+    if (!e.message.includes('nothing to commit')) {
+      console.error('[tunnel] Ошибка git push:', e.stderr?.toString() || e.message);
+    }
+  }
 }
 
 function startTunnel() {
@@ -30,7 +44,7 @@ function startTunnel() {
     '-o', 'ServerAliveCountMax=3',
     '-R', '80:localhost:3000',
     'nokey@localhost.run'
-  ]);
+  ], { windowsHide: true });
 
   ssh.stdout.on('data', (data) => {
     const text = data.toString();
