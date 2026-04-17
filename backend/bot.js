@@ -182,6 +182,11 @@ bot.onText(/\/ref/, (msg) => {
   );
 });
 
+// /myid — показать свой Telegram ID
+bot.onText(/\/myid/, (msg) => {
+  bot.sendMessage(msg.chat.id, `🪪 Твой Telegram ID: \`${msg.from.id}\``, { parse_mode: 'Markdown' });
+});
+
 // /admin
 bot.onText(/\/admin/, (msg) => {
   addLog('command', msg.from.id, msg.from.username, '/admin');
