@@ -2,7 +2,7 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const API_URL = 'https://xylivpnbot.loca.lt';
+const API_URL = 'https://soft-seahorse-56.loca.lt';
 
 let currentUser = null;
 
