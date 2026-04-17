@@ -72,6 +72,203 @@ async function loadProfile() {
   } catch {}
 }
 
+// ─── TON ПОПОЛНЕНИЕ ────────────────────────────
+let tonRate = 0;
+let tonPollTimer = null;
+
+document.getElementById('topup-ton-btn').addEventListener('click', openTonModal);
+
+async function openTonModal() {
+  const modal = document.getElementById('modal');
+  const content = document.getElementById('modal-content');
+
+  content.innerHTML = '<div class="loader" style="padding:40px 0"><div class="spin"></div></div>';
+  modal.classList.remove('hidden');
+
+  try {
+    const res = await fetch(`${API_URL}/api/topup/ton/rate`);
+    const data = await res.json();
+    tonRate = data.rate || 0;
+  } catch {}
+
+  renderTonStep1();
+
+  document.querySelector('.modal-backdrop').addEventListener('click', closeTonModal);
+}
+
+function closeTonModal() {
+  clearInterval(tonPollTimer);
+  tonPollTimer = null;
+  closeModal();
+}
+
+function renderTonStep1() {
+  const content = document.getElementById('modal-content');
+  const rateStr = tonRate ? tonRate.toLocaleString('ru-RU', { maximumFractionDigits: 0 }) : '—';
+  const updMins = tonRate ? Math.round((Date.now() - (window._tonRateUpdatedAt || 0)) / 60000) : null;
+
+  content.innerHTML = `
+    <div class="m-plan-name">💎 Пополнить через TON</div>
+    <div class="ton-rate-row">
+      <span class="ton-rate-val">1 TON ≈ ${rateStr} ₽</span>
+      <span class="ton-rate-hint">обновляется каждый час</span>
+    </div>
+
+    <div class="admin-amount-wrap" style="margin-bottom:14px">
+      <input class="admin-amount-input" id="ton-amount-input" type="number"
+        inputmode="decimal" placeholder="Сумма в рублях" min="50" step="10" autocomplete="off"/>
+      <div class="admin-amount-presets">
+        ${[100,200,500,1000].map(v => `<button class="amount-preset" data-val="${v}">${v} ₽</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="ton-calc-row" id="ton-calc-row" style="display:none">
+      <span class="ton-calc-label">К оплате</span>
+      <span class="ton-calc-val" id="ton-calc-val">— TON</span>
+    </div>
+
+    <button class="m-confirm-btn" id="ton-next-btn">Создать платёж</button>
+    <button class="m-cancel-btn" id="cancel-modal">Отмена</button>
+  `;
+
+  document.getElementById('cancel-modal').addEventListener('click', closeTonModal);
+
+  const amountInput = document.getElementById('ton-amount-input');
+  const calcRow = document.getElementById('ton-calc-row');
+  const calcVal = document.getElementById('ton-calc-val');
+
+  amountInput.addEventListener('input', () => {
+    const rub = parseFloat(amountInput.value);
+    if (rub >= 50 && tonRate) {
+      const ton = (rub / tonRate).toFixed(4);
+      calcVal.textContent = `${ton} TON`;
+      calcRow.style.display = '';
+    } else {
+      calcRow.style.display = 'none';
+    }
+  });
+
+  content.querySelectorAll('.amount-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      amountInput.value = btn.dataset.val;
+      amountInput.dispatchEvent(new Event('input'));
+      content.querySelectorAll('.amount-preset').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  document.getElementById('ton-next-btn').addEventListener('click', async () => {
+    const amount_rub = parseFloat(amountInput.value);
+    if (!amount_rub || amount_rub < 50) { showToast('Минимум 50 ₽'); return; }
+    if (!initData()) { showToast('Открой через Telegram'); return; }
+
+    const btn = document.getElementById('ton-next-btn');
+    btn.disabled = true; btn.textContent = 'Создаю…';
+
+    try {
+      const res = await fetch(`${API_URL}/api/topup/ton/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-init-data': initData() },
+        body: JSON.stringify({ amount_rub })
+      });
+      const json = await res.json();
+      if (json.ok) renderTonStep2(json);
+      else { showToast(json.error || 'Ошибка'); btn.disabled = false; btn.textContent = 'Создать платёж'; }
+    } catch {
+      showToast('Ошибка соединения');
+      btn.disabled = false; btn.textContent = 'Создать платёж';
+    }
+  });
+}
+
+function renderTonStep2(payment) {
+  const content = document.getElementById('modal-content');
+  content.innerHTML = `
+    <div class="m-plan-name">💎 Отправь TON</div>
+    <div class="m-plan-desc">Переведи точную сумму на кошелёк с указанным комментарием. Баланс зачислится автоматически.</div>
+
+    <div class="ton-pay-field">
+      <div class="ton-pay-label">Адрес кошелька</div>
+      <div class="ton-pay-row">
+        <div class="ton-pay-val" id="ton-wallet-val">${payment.wallet}</div>
+        <button class="copy-btn" data-copy="${payment.wallet}">Копировать</button>
+      </div>
+    </div>
+
+    <div class="ton-pay-field">
+      <div class="ton-pay-label">Сумма</div>
+      <div class="ton-pay-row">
+        <div class="ton-pay-val ton-amount-big">${payment.amount_ton} TON</div>
+        <button class="copy-btn" data-copy="${payment.amount_ton}">Копировать</button>
+      </div>
+    </div>
+
+    <div class="ton-pay-field ton-pay-comment">
+      <div class="ton-pay-label">Комментарий <span class="ton-required">обязателен!</span></div>
+      <div class="ton-pay-row">
+        <div class="ton-pay-val">${payment.comment}</div>
+        <button class="copy-btn" data-copy="${payment.comment}">Копировать</button>
+      </div>
+    </div>
+
+    <div class="ton-status-row" id="ton-status-row">
+      <div class="spin" style="width:16px;height:16px;border-width:2px"></div>
+      <span>Жду оплату…</span>
+    </div>
+
+    <div class="ton-expire-hint">Платёж действителен 30 минут · ${payment.amount_rub} ₽</div>
+
+    <button class="m-cancel-btn" id="cancel-modal" style="margin-top:8px">Закрыть</button>
+  `;
+
+  // Copy buttons
+  content.querySelectorAll('.copy-btn[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+        const old = btn.textContent;
+        btn.textContent = 'Скопировано';
+        setTimeout(() => btn.textContent = old, 1500);
+      });
+    });
+  });
+
+  document.getElementById('cancel-modal').addEventListener('click', closeTonModal);
+
+  // Polling каждые 5 секунд
+  tonPollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/topup/ton/status`, {
+        headers: { 'x-init-data': initData() }
+      });
+      const json = await res.json();
+      if (json.status === 'paid') {
+        clearInterval(tonPollTimer);
+        renderTonSuccess(json.payment);
+        loadProfile();
+      } else if (json.status === 'expired') {
+        clearInterval(tonPollTimer);
+        const row = document.getElementById('ton-status-row');
+        if (row) row.innerHTML = '<span style="color:var(--amber)">⏰ Время вышло</span>';
+      }
+    } catch {}
+  }, 5000);
+}
+
+function renderTonSuccess(payment) {
+  const content = document.getElementById('modal-content');
+  content.innerHTML = `
+    <div style="text-align:center;padding:20px 0 10px">
+      <div style="font-size:52px;margin-bottom:12px">✅</div>
+      <div class="m-plan-name">Оплачено!</div>
+      <div style="font-size:13px;color:var(--muted);margin:8px 0 20px">
+        +${payment.amount_rub} ₽ зачислено на баланс
+      </div>
+      <button class="m-confirm-btn" id="cancel-modal">Отлично</button>
+    </div>
+  `;
+  document.getElementById('cancel-modal').addEventListener('click', closeTonModal);
+}
+
 // ─── ПРИГЛАСИТЬ ────────────────────────────────
 document.getElementById('ref-btn').addEventListener('click', () => {
   if (!currentUser) return showToast('Открой через Telegram');

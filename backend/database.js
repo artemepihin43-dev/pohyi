@@ -15,11 +15,12 @@ db.defaults({
     { id: 2, name: '3 месяца', description: '90 дней. Безлимит. Скидка 20%. Все серверы.',  duration_days: 90,  price: 71700,  active: true },
     { id: 3, name: '1 год',    description: '365 дней. Безлимит. Лучшая цена!',             duration_days: 365, price: 239900, active: true }
   ],
-  vpn_keys:  [],
-  orders:    [],
-  users:     [],
-  referrals: [],
-  logs:      []
+  vpn_keys:     [],
+  orders:       [],
+  users:        [],
+  referrals:    [],
+  logs:         [],
+  ton_payments: []
 }).write();
 
 module.exports = db;

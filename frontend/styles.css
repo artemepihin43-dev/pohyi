@@ -613,6 +613,93 @@ header {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
+/* ── HERO ACTIONS ────────────────────── */
+.hero-actions {
+  display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+}
+
+.hero-action-btn {
+  display: flex; align-items: center; gap: 6px;
+  border-radius: var(--r-pill);
+  padding: 9px 14px;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  transition: background .2s, transform .15s;
+  border: 1px solid;
+}
+.hero-action-btn:active { transform: scale(.96); }
+
+.topup-ton-btn {
+  background: rgba(0,136,204,.15);
+  border-color: rgba(0,136,204,.3);
+  color: #60C8FF;
+}
+.topup-ton-btn:active { background: rgba(0,136,204,.25); }
+
+/* ── TON MODAL ───────────────────────── */
+.ton-rate-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,136,204,.08);
+  border: 1px solid rgba(0,136,204,.18);
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 18px;
+}
+.ton-rate-val { font-size: 15px; font-weight: 700; color: #60C8FF; }
+.ton-rate-hint { font-size: 11px; color: var(--muted); }
+
+.ton-calc-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 11px 16px; margin-bottom: 18px;
+}
+.ton-calc-label { font-size: 13px; color: var(--muted); }
+.ton-calc-val { font-size: 18px; font-weight: 800; color: #60C8FF; letter-spacing: -.3px; }
+
+.ton-pay-field {
+  margin-bottom: 12px;
+}
+.ton-pay-label {
+  font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.ton-required {
+  background: rgba(239,68,68,.12); color: #FCA5A5;
+  border: 1px solid rgba(239,68,68,.2);
+  border-radius: 4px; padding: 1px 6px;
+  font-size: 10px; font-weight: 600; text-transform: none; letter-spacing: 0;
+}
+.ton-pay-row {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(0,0,0,.35); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px;
+}
+.ton-pay-val {
+  flex: 1; font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px; color: var(--text);
+  word-break: break-all; line-height: 1.4;
+}
+.ton-amount-big { font-size: 18px; font-weight: 800; color: #60C8FF; font-family: inherit; }
+
+.ton-pay-comment .ton-pay-row {
+  border-color: rgba(239,68,68,.25);
+  background: rgba(239,68,68,.05);
+}
+.ton-pay-comment .ton-pay-val { color: #FCA5A5; }
+
+.ton-status-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(0,136,204,.08);
+  border: 1px solid rgba(0,136,204,.18);
+  border-radius: 12px; padding: 12px 16px;
+  font-size: 13px; color: #60C8FF; font-weight: 500;
+  margin: 16px 0 8px;
+}
+
+.ton-expire-hint {
+  font-size: 11px; color: var(--muted);
+  text-align: center; margin-bottom: 4px;
+}
+
 /* ── ADMIN TAB ───────────────────────── */
 .tab.tab-admin.active {
   background: rgba(239,68,68,.1);

@@ -493,6 +493,160 @@ app.post('/api/admin/tg/topup', adminTgAuth, (req, res) => {
   res.json({ ok: true, new_balance: newBalance });
 });
 
+// ─── TON PAYMENTS ────────────────────────────────────────
+
+let tonRateRub = 0;
+let tonRateUpdatedAt = 0;
+
+function httpsGet(hostname, path) {
+  return new Promise((resolve, reject) => {
+    const req = require('https').request({ hostname, path, method: 'GET' }, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function fetchTonRate() {
+  try {
+    const json = await httpsGet(
+      'api.coingecko.com',
+      '/api/v3/simple/price?ids=the-open-network&vs_currencies=rub'
+    );
+    const rate = json['the-open-network']?.rub;
+    if (rate > 0) {
+      tonRateRub = rate;
+      tonRateUpdatedAt = Date.now();
+      console.log(`💎 TON/RUB = ${rate}`);
+    }
+  } catch (e) { console.error('TON rate error:', e.message); }
+}
+
+async function checkTonTransactions() {
+  const walletAddress = process.env.TON_WALLET_ADDRESS;
+  const apiKey = process.env.TON_API_KEY;
+  if (!walletAddress || walletAddress.includes('YOUR_TON') || !apiKey) return;
+
+  const pending = db.get('ton_payments').filter({ status: 'pending' }).value();
+  if (!pending.length) return;
+
+  try {
+    const json = await httpsGet(
+      'toncenter.com',
+      `/api/v2/getTransactions?address=${encodeURIComponent(walletAddress)}&limit=50&api_key=${apiKey}`
+    );
+    if (!json.ok || !Array.isArray(json.result)) return;
+
+    for (const tx of json.result) {
+      const comment = tx.in_msg?.message || '';
+      const valueNano = parseInt(tx.in_msg?.value || '0');
+      const utime = (tx.utime || 0) * 1000;
+      if (!comment || valueNano <= 0) continue;
+
+      const payment = pending.find(p =>
+        p.comment === comment &&
+        p.status === 'pending' &&
+        utime >= new Date(p.created_at).getTime() - 5 * 60 * 1000
+      );
+      if (!payment) continue;
+
+      // Проверяем что прислали >= 97% ожидаемой суммы
+      const expectedNano = Math.floor(payment.amount_ton * 1e9);
+      if (valueNano < Math.floor(expectedNano * 0.97)) continue;
+
+      const user = db.get('users').find({ telegram_id: payment.telegram_id }).value();
+      if (!user) continue;
+
+      const kopeks = Math.round(payment.amount_rub * 100);
+      const newBalance = (user.balance || 0) + kopeks;
+      db.get('users').find({ telegram_id: payment.telegram_id }).assign({ balance: newBalance }).write();
+      db.get('ton_payments').find({ id: payment.id }).assign({
+        status: 'paid',
+        paid_at: new Date().toISOString(),
+        tx_hash: tx.transaction_id?.hash || null
+      }).write();
+
+      addLog('payment', payment.telegram_id, null, 'ton_topup',
+        `+${payment.amount_rub} RUB / ${payment.amount_ton} TON`);
+
+      const rubles = (newBalance / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+      bot.sendMessage(payment.telegram_id,
+        `💎 *TON-платёж подтверждён!*\n\n` +
+        `Зачислено: *+${payment.amount_rub} ₽*\n` +
+        `Баланс: *${rubles} ₽*`,
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
+    }
+  } catch (e) { console.error('TON check error:', e.message); }
+}
+
+// Курс — раз в час, проверка транзакций — раз в минуту
+fetchTonRate();
+setInterval(fetchTonRate, 60 * 60 * 1000);
+setInterval(checkTonTransactions, 60 * 1000);
+
+// GET /api/topup/ton/rate
+app.get('/api/topup/ton/rate', (req, res) => {
+  res.json({ rate: tonRateRub, updated_at: tonRateUpdatedAt });
+});
+
+// POST /api/topup/ton/create
+app.post('/api/topup/ton/create', (req, res) => {
+  const initData = req.headers['x-init-data'];
+  const tgUser = verifyTelegramData(initData);
+  if (!tgUser) return res.status(401).json({ error: 'Unauthorized' });
+  if (!tonRateRub) return res.status(503).json({ error: 'Курс TON недоступен, попробуй позже' });
+
+  const walletAddress = process.env.TON_WALLET_ADDRESS;
+  if (!walletAddress || walletAddress.includes('YOUR_TON')) {
+    return res.status(503).json({ error: 'Кошелёк не настроен' });
+  }
+
+  const amount_rub = Number(req.body.amount_rub);
+  if (!amount_rub || amount_rub < 50) return res.status(400).json({ error: 'Минимум 50 ₽' });
+
+  const amount_ton = parseFloat((amount_rub / tonRateRub).toFixed(4));
+  const comment = `XYLI${tgUser.id}`;
+
+  const existing = db.get('ton_payments').find({ telegram_id: tgUser.id, status: 'pending' }).value();
+  if (existing) {
+    db.get('ton_payments').find({ id: existing.id }).assign({
+      amount_rub, amount_ton, created_at: new Date().toISOString()
+    }).write();
+  } else {
+    db.get('ton_payments').push({
+      id: Date.now(), telegram_id: tgUser.id,
+      amount_rub, amount_ton, comment, status: 'pending',
+      created_at: new Date().toISOString(), paid_at: null, tx_hash: null
+    }).write();
+  }
+
+  res.json({ ok: true, wallet: walletAddress, amount_ton, amount_rub, comment, rate: tonRateRub });
+});
+
+// GET /api/topup/ton/status
+app.get('/api/topup/ton/status', (req, res) => {
+  const initData = req.headers['x-init-data'];
+  const tgUser = verifyTelegramData(initData);
+  if (!tgUser) return res.status(401).json({ error: 'Unauthorized' });
+
+  const payments = db.get('ton_payments').filter({ telegram_id: tgUser.id }).value();
+  const payment = payments.sort((a, b) => b.id - a.id)[0];
+  if (!payment) return res.json({ status: 'none' });
+
+  if (payment.status === 'pending') {
+    const age = Date.now() - new Date(payment.created_at).getTime();
+    if (age > 30 * 60 * 1000) {
+      db.get('ton_payments').find({ id: payment.id }).assign({ status: 'expired' }).write();
+      return res.json({ status: 'expired' });
+    }
+  }
+  res.json({ status: payment.status, payment });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   console.log(`✅ Сервер запущен на порту ${PORT}`);
