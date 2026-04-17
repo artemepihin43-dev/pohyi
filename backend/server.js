@@ -90,7 +90,8 @@ app.get('/api/me', (req, res) => {
     ref_code: user.ref_code,
     referral_link: referralLink,
     referral_count: paidReferrals,
-    referral_pending: pendingReferrals
+    referral_pending: pendingReferrals,
+    is_admin: tgUser.id === parseInt(process.env.ADMIN_TELEGRAM_ID)
   });
 });
 
@@ -271,6 +272,17 @@ function adminAuth(req, res, next) {
   next();
 }
 
+function adminTgAuth(req, res, next) {
+  const initData = req.headers['x-init-data'];
+  const tgUser = verifyTelegramData(initData);
+  if (!tgUser) return res.status(401).json({ error: 'Unauthorized' });
+  if (tgUser.id !== parseInt(process.env.ADMIN_TELEGRAM_ID)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  req.tgUser = tgUser;
+  next();
+}
+
 // GET /api/admin/users
 app.get('/api/admin/users', adminAuth, (req, res) => {
   const users = db.get('users').value();
@@ -384,6 +396,101 @@ app.post('/api/admin/broadcast', adminAuth, async (req, res) => {
   }
   addLog('admin', null, 'admin', 'broadcast', `sent: ${sent}, failed: ${failed}`);
   res.json({ ok: true, sent, failed });
+});
+
+// ─── ADMIN TG (авторизация через Telegram initData) ───────────────────────
+
+// GET /api/admin/tg/users — список пользователей
+app.get('/api/admin/tg/users', adminTgAuth, (req, res) => {
+  const users = db.get('users').value();
+  const result = users.map(u => ({
+    telegram_id: u.telegram_id,
+    username: u.username,
+    first_name: u.first_name,
+    last_name: u.last_name,
+    balance: u.balance,
+    created_at: u.created_at,
+    paid_orders: db.get('orders').filter({ telegram_user_id: u.telegram_id, status: 'paid' }).size().value()
+  }));
+  res.json(result);
+});
+
+// GET /api/admin/tg/plans — тарифы с количеством ключей
+app.get('/api/admin/tg/plans', adminTgAuth, (req, res) => {
+  const plans = db.get('plans').value();
+  const result = plans.map(p => ({
+    ...p,
+    available: db.get('vpn_keys').filter({ plan_id: p.id, status: 'available' }).size().value(),
+    used:      db.get('vpn_keys').filter({ plan_id: p.id, status: 'used' }).size().value()
+  }));
+  res.json(result);
+});
+
+// POST /api/admin/tg/keys — загрузить серверы/ключи для тарифа
+app.post('/api/admin/tg/keys', adminTgAuth, (req, res) => {
+  const { plan_id, keys } = req.body;
+  if (!plan_id || !Array.isArray(keys) || !keys.length) {
+    return res.status(400).json({ error: 'Нужны plan_id и массив ключей' });
+  }
+  const plan = db.get('plans').find({ id: plan_id }).value();
+  if (!plan) return res.status(404).json({ error: 'Тариф не найден' });
+
+  const clean = keys.map(k => k.trim()).filter(Boolean);
+  clean.forEach((k, i) => {
+    db.get('vpn_keys').push({
+      id: Date.now() + i,
+      key_value: k,
+      plan_id,
+      status: 'available',
+      created_at: new Date().toISOString()
+    }).write();
+  });
+  addLog('admin', req.tgUser.id, req.tgUser.username, 'add_keys',
+    `plan: ${plan.name}, +${clean.length} ключей`);
+  res.json({ ok: true, added: clean.length });
+});
+
+// GET /api/admin/tg/keys-list — список ключей тарифа
+app.get('/api/admin/tg/keys-list', adminTgAuth, (req, res) => {
+  const planId = req.query.plan_id ? parseInt(req.query.plan_id) : null;
+  const keys = planId
+    ? db.get('vpn_keys').filter({ plan_id: planId }).value()
+    : db.get('vpn_keys').value();
+  res.json(keys.slice().reverse());
+});
+
+// DELETE /api/admin/tg/keys/:id — удалить ключ
+app.delete('/api/admin/tg/keys/:id', adminTgAuth, (req, res) => {
+  const id = parseFloat(req.params.id);
+  const key = db.get('vpn_keys').find({ id }).value();
+  if (!key) return res.status(404).json({ error: 'Ключ не найден' });
+  db.get('vpn_keys').remove({ id }).write();
+  addLog('admin', req.tgUser.id, req.tgUser.username, 'delete_key', `key: ${key.key_value}`);
+  res.json({ ok: true });
+});
+
+// POST /api/admin/tg/topup — пополнить баланс пользователя
+app.post('/api/admin/tg/topup', adminTgAuth, (req, res) => {
+  const { telegram_id, amount } = req.body;
+  if (!telegram_id || typeof amount !== 'number' || amount <= 0) {
+    return res.status(400).json({ error: 'Нужны telegram_id и amount (рублей)' });
+  }
+  const user = db.get('users').find({ telegram_id }).value();
+  if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+  const kopeks = Math.round(amount * 100);
+  const newBalance = user.balance + kopeks;
+  db.get('users').find({ telegram_id }).assign({ balance: newBalance }).write();
+  addLog('admin', req.tgUser.id, req.tgUser.username, 'topup_balance',
+    `user: ${telegram_id}, +${kopeks} коп. → итого: ${newBalance} коп.`);
+
+  const rubles = (newBalance / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+  bot.sendMessage(telegram_id,
+    `💰 *Баланс пополнен!*\n\nЗачислено: *+${amount} ₽*\nВаш баланс: *${rubles} ₽*`,
+    { parse_mode: 'Markdown' }
+  ).catch(() => {});
+
+  res.json({ ok: true, new_balance: newBalance });
 });
 
 const PORT = process.env.PORT || 3000;

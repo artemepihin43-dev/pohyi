@@ -15,6 +15,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'mykeys') loadOrders();
     if (btn.dataset.tab === 'referral') loadReferralPage();
+    if (btn.dataset.tab === 'admin') loadAdminPanel();
   });
 });
 
@@ -51,6 +52,9 @@ async function loadProfile() {
     const earned = (currentUser.referral_count || 0) * 6900;
     document.getElementById('referral-stat').textContent =
       `Купили: ${currentUser.referral_count || 0} · Ждут: ${currentUser.referral_pending || 0} · +${fmt(earned)} ₽`;
+    if (currentUser.is_admin) {
+      document.getElementById('tab-btn-admin').style.display = '';
+    }
   } catch {}
 }
 
@@ -312,6 +316,365 @@ function loadReferralPage() {
   document.getElementById('copy-ref').addEventListener('click', () => {
     navigator.clipboard.writeText(referral_link).then(() => showToast('Ссылка скопирована'));
   });
+}
+
+// ─── АДМИН ПАНЕЛЬ ──────────────────────────────
+let adminUsers = [];
+let adminSection = 'users'; // 'users' | 'servers'
+
+async function loadAdminPanel() {
+  const container = document.getElementById('admin-panel');
+  container.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+
+  if (!initData()) {
+    container.innerHTML = emptyState('🔒', 'Только в Telegram', 'Открой приложение через бота');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/tg/users`, {
+      headers: { 'x-init-data': initData() }
+    });
+    if (!res.ok) { container.innerHTML = emptyState('⛔', 'Нет доступа', 'Только для администратора'); return; }
+    adminUsers = await res.json();
+    renderAdminShell();
+    if (adminSection === 'users') renderUsersSection();
+    else renderServersSection();
+  } catch {
+    container.innerHTML = emptyState('⚠️', 'Ошибка загрузки', 'Попробуй позже');
+  }
+}
+
+function renderAdminShell() {
+  const container = document.getElementById('admin-panel');
+  const totalBalance = adminUsers.reduce((s, u) => s + (u.balance || 0), 0);
+
+  container.innerHTML = `
+    <div class="admin-stats-row">
+      <div class="admin-stat-card">
+        <div class="admin-stat-label">Пользователей</div>
+        <div class="admin-stat-val">${adminUsers.length}</div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-label">Балансов всего</div>
+        <div class="admin-stat-val green">${fmt(totalBalance)} ₽</div>
+      </div>
+    </div>
+
+    <div class="admin-seg">
+      <button class="admin-seg-btn ${adminSection === 'users' ? 'active' : ''}" data-sec="users">Пользователи</button>
+      <button class="admin-seg-btn ${adminSection === 'servers' ? 'active' : ''}" data-sec="servers">Сервера</button>
+    </div>
+
+    <div id="admin-section-body"></div>
+  `;
+
+  container.querySelectorAll('.admin-seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      adminSection = btn.dataset.sec;
+      container.querySelectorAll('.admin-seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (adminSection === 'users') renderUsersSection();
+      else renderServersSection();
+    });
+  });
+}
+
+function renderUsersSection() {
+  const body = document.getElementById('admin-section-body');
+  body.innerHTML = `
+    <div class="admin-search-wrap">
+      <input class="admin-search" id="admin-search" type="text" placeholder="Поиск по имени или @username…" autocomplete="off"/>
+    </div>
+    <div id="admin-users-list" class="admin-users-list"></div>
+  `;
+  renderUserCards(adminUsers);
+  document.getElementById('admin-search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    const filtered = q
+      ? adminUsers.filter(u =>
+          (u.first_name || '').toLowerCase().includes(q) ||
+          (u.last_name || '').toLowerCase().includes(q) ||
+          (u.username || '').toLowerCase().includes(q) ||
+          String(u.telegram_id).includes(q)
+        )
+      : adminUsers;
+    renderUserCards(filtered);
+  });
+}
+
+async function renderServersSection() {
+  const body = document.getElementById('admin-section-body');
+  body.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/tg/plans`, {
+      headers: { 'x-init-data': initData() }
+    });
+    const plans = await res.json();
+    renderServersForm(plans);
+  } catch {
+    body.innerHTML = emptyState('⚠️', 'Ошибка загрузки', 'Попробуй позже');
+  }
+}
+
+function renderServersForm(plans) {
+  const body = document.getElementById('admin-section-body');
+  const activePlans = plans.filter(p => p.active);
+  const selectedId = activePlans[0]?.id;
+
+  body.innerHTML = `
+    <div class="servers-plans-grid" id="servers-plans-grid">
+      ${plans.map(p => `
+        <div class="srv-plan-pill ${p.id === selectedId ? 'active' : ''}" data-id="${p.id}">
+          <div class="srv-plan-name">${p.name}</div>
+          <div class="srv-plan-count">${p.available} шт.</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <input type="hidden" id="selected-plan-id" value="${selectedId || ''}"/>
+
+    <div class="servers-keys-block">
+      <div class="servers-keys-header">
+        <span class="servers-keys-label">Ключи / конфиги</span>
+        <span class="servers-keys-hint">Каждый на новой строке</span>
+      </div>
+      <textarea class="servers-textarea" id="servers-textarea"
+        placeholder="vless://abc123...&#10;vless://def456...&#10;ss://..." rows="6"></textarea>
+      <button class="servers-add-btn" id="servers-add-btn">Добавить серверы</button>
+    </div>
+
+    <div class="servers-existing-wrap">
+      <div class="servers-existing-label">Доступные ключи</div>
+      <div id="servers-existing-list">
+        <div class="loader"><div class="spin"></div></div>
+      </div>
+    </div>
+  `;
+
+  // Переключение тарифа
+  body.querySelectorAll('.srv-plan-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      body.querySelectorAll('.srv-plan-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      document.getElementById('selected-plan-id').value = pill.dataset.id;
+      loadExistingKeys(parseInt(pill.dataset.id), plans);
+    });
+  });
+
+  // Добавление ключей
+  document.getElementById('servers-add-btn').addEventListener('click', async () => {
+    const planId = parseInt(document.getElementById('selected-plan-id').value);
+    const raw = document.getElementById('servers-textarea').value;
+    const keys = raw.split('\n').map(k => k.trim()).filter(Boolean);
+    if (!keys.length) { showToast('Введи хотя бы один ключ'); return; }
+
+    const btn = document.getElementById('servers-add-btn');
+    btn.disabled = true; btn.textContent = 'Загрузка…';
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/tg/keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-init-data': initData() },
+        body: JSON.stringify({ plan_id: planId, keys })
+      });
+      const json = await res.json();
+      if (json.ok) {
+        showToast(`✅ Добавлено ${json.added} ключей`);
+        document.getElementById('servers-textarea').value = '';
+        // обновим счётчики
+        const plansRes = await fetch(`${API_URL}/api/admin/tg/plans`, { headers: { 'x-init-data': initData() } });
+        const updatedPlans = await plansRes.json();
+        // обновить пилюли
+        updatedPlans.forEach(p => {
+          const pill = body.querySelector(`.srv-plan-pill[data-id="${p.id}"]`);
+          if (pill) pill.querySelector('.srv-plan-count').textContent = p.available + ' шт.';
+        });
+        loadExistingKeys(planId, updatedPlans);
+      } else {
+        showToast(json.error || 'Ошибка');
+      }
+    } catch { showToast('Ошибка соединения'); }
+
+    btn.disabled = false; btn.textContent = 'Добавить серверы';
+  });
+
+  if (selectedId) loadExistingKeys(selectedId, plans);
+}
+
+async function loadExistingKeys(planId, plans) {
+  const list = document.getElementById('servers-existing-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loader" style="padding:20px 0"><div class="spin"></div></div>';
+
+  try {
+    const keysRes = await fetch(`${API_URL}/api/admin/tg/keys-list?plan_id=${planId}`, {
+      headers: { 'x-init-data': initData() }
+    });
+    if (!keysRes.ok) { list.innerHTML = ''; return; }
+    const keys = await keysRes.json();
+
+    if (!keys.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0;text-align:center">Ключей нет</div>';
+      return;
+    }
+
+    list.innerHTML = '';
+    keys.slice(0, 30).forEach(k => {
+      const row = document.createElement('div');
+      row.className = 'srv-key-row';
+      row.dataset.id = k.id;
+      row.innerHTML = `
+        <div class="srv-key-val">${k.key_value}</div>
+        <div class="srv-key-status ${k.status === 'available' ? 'avail' : 'used'}">${k.status === 'available' ? 'свободен' : 'выдан'}</div>
+        ${k.status === 'available' ? `<button class="srv-key-del" data-id="${k.id}">✕</button>` : ''}
+      `;
+      const delBtn = row.querySelector('.srv-key-del');
+      if (delBtn) {
+        delBtn.addEventListener('click', async () => {
+          delBtn.disabled = true;
+          try {
+            const r = await fetch(`${API_URL}/api/admin/tg/keys/${k.id}`, {
+              method: 'DELETE',
+              headers: { 'x-init-data': initData() }
+            });
+            if ((await r.json()).ok) {
+              row.remove();
+              showToast('Ключ удалён');
+              // обновить счётчик
+              const pill = document.querySelector(`.srv-plan-pill[data-id="${planId}"]`);
+              if (pill) {
+                const cnt = pill.querySelector('.srv-plan-count');
+                const cur = parseInt(cnt.textContent) || 0;
+                cnt.textContent = Math.max(0, cur - 1) + ' шт.';
+              }
+            }
+          } catch { showToast('Ошибка'); delBtn.disabled = false; }
+        });
+      }
+      list.appendChild(row);
+    });
+    if (keys.length > 30) {
+      const more = document.createElement('div');
+      more.style.cssText = 'color:var(--muted);font-size:12px;text-align:center;padding:8px 0';
+      more.textContent = `Показаны 30 из ${keys.length}`;
+      list.appendChild(more);
+    }
+  } catch { list.innerHTML = ''; }
+}
+
+function renderUserCards(users) {
+  const list = document.getElementById('admin-users-list');
+  if (!users.length) {
+    list.innerHTML = emptyState('🔍', 'Не найдено', 'Попробуй другой запрос');
+    return;
+  }
+  list.innerHTML = '';
+  users.forEach(u => {
+    const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—';
+    const uname = u.username ? `@${u.username}` : `ID: ${u.telegram_id}`;
+    const card = document.createElement('div');
+    card.className = 'admin-user-card';
+    card.innerHTML = `
+      <div class="auc-left">
+        <div class="auc-avatar">${(u.first_name || '?')[0].toUpperCase()}</div>
+        <div class="auc-info">
+          <div class="auc-name">${name}</div>
+          <div class="auc-handle">${uname}</div>
+          <div class="auc-meta">${u.paid_orders} покупок</div>
+        </div>
+      </div>
+      <div class="auc-right">
+        <div class="auc-balance">${fmt(u.balance || 0)} ₽</div>
+        <button class="auc-topup-btn" data-id="${u.telegram_id}" data-name="${name}">Пополнить</button>
+      </div>
+    `;
+    card.querySelector('.auc-topup-btn').addEventListener('click', () => openTopupModal(u));
+    list.appendChild(card);
+  });
+}
+
+function openTopupModal(user) {
+  const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || String(user.telegram_id);
+  const modal = document.getElementById('modal');
+  const content = document.getElementById('modal-content');
+
+  content.innerHTML = `
+    <div class="m-plan-name">Пополнение баланса</div>
+    <div class="m-plan-desc">${name}${user.username ? ' · @' + user.username : ''}</div>
+    <div class="m-price-block" style="margin-bottom:16px">
+      <span class="m-price-label">Текущий баланс</span>
+      <span class="m-price-value">${fmt(user.balance || 0)} ₽</span>
+    </div>
+    <div class="admin-amount-wrap">
+      <input class="admin-amount-input" id="topup-amount" type="number" inputmode="decimal" placeholder="Сумма в рублях" min="1" step="1" autocomplete="off"/>
+      <div class="admin-amount-presets">
+        ${[50, 100, 200, 500].map(v => `<button class="amount-preset" data-val="${v}">${v} ₽</button>`).join('')}
+      </div>
+    </div>
+    <button class="m-confirm-btn" id="topup-confirm">Пополнить</button>
+    <button class="m-cancel-btn" id="cancel-modal">Отмена</button>
+  `;
+
+  modal.classList.remove('hidden');
+
+  content.querySelectorAll('.amount-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('topup-amount').value = btn.dataset.val;
+      content.querySelectorAll('.amount-preset').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  document.getElementById('topup-confirm').addEventListener('click', async () => {
+    const amountStr = document.getElementById('topup-amount').value.trim();
+    const amount = parseFloat(amountStr);
+    if (!amount || amount <= 0) { showToast('Введи сумму'); return; }
+
+    const confirmBtn = document.getElementById('topup-confirm');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Отправка…';
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/tg/topup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-init-data': initData() },
+        body: JSON.stringify({ telegram_id: user.telegram_id, amount })
+      });
+      const json = await res.json();
+      if (json.ok) {
+        closeModal();
+        showToast(`✅ +${amount} ₽ зачислено`);
+        // обновляем локальный список
+        const idx = adminUsers.findIndex(u => u.telegram_id === user.telegram_id);
+        if (idx !== -1) adminUsers[idx].balance = json.new_balance;
+        renderAdminPanel(adminUsers);
+        // восстановить поиск если был
+        const q = document.getElementById('admin-search')?.value.trim().toLowerCase();
+        if (q) {
+          const filtered = adminUsers.filter(u =>
+            (u.first_name || '').toLowerCase().includes(q) ||
+            (u.last_name || '').toLowerCase().includes(q) ||
+            (u.username || '').toLowerCase().includes(q) ||
+            String(u.telegram_id).includes(q)
+          );
+          renderUserCards(filtered);
+        }
+      } else {
+        showToast(json.error || 'Ошибка');
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Пополнить';
+      }
+    } catch {
+      showToast('Ошибка соединения');
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Пополнить';
+    }
+  });
+
+  document.getElementById('cancel-modal').addEventListener('click', closeModal);
+  document.querySelector('.modal-backdrop').addEventListener('click', closeModal);
 }
 
 // ─── EMPTY STATE ───────────────────────────────

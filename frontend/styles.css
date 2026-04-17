@@ -612,3 +612,286 @@ header {
   from { opacity: 0; transform: translateX(-50%) translateY(10px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+/* ── ADMIN TAB ───────────────────────── */
+.tab.tab-admin.active {
+  background: rgba(239,68,68,.1);
+  border-color: rgba(239,68,68,.25);
+  color: #FCA5A5;
+}
+.tab.tab-admin.active svg { color: #FCA5A5; }
+
+/* ── ADMIN PANEL ─────────────────────── */
+.admin-stats-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 14px;
+}
+
+.admin-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+}
+
+.admin-stat-label {
+  font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px;
+  margin-bottom: 8px;
+}
+
+.admin-stat-val {
+  font-size: 22px; font-weight: 800;
+  letter-spacing: -1px; color: var(--white);
+}
+.admin-stat-val.green { color: var(--green-l); }
+
+.admin-search-wrap { margin-bottom: 12px; }
+
+.admin-search {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-family: inherit; font-size: 14px; color: var(--text);
+  outline: none;
+  transition: border-color .2s;
+}
+.admin-search::placeholder { color: var(--muted); }
+.admin-search:focus { border-color: var(--border-hi); }
+
+.admin-users-list { display: flex; flex-direction: column; gap: 8px; }
+
+.admin-user-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auc-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+
+.auc-avatar {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, rgba(139,92,246,.3), rgba(109,40,217,.2));
+  border: 1px solid rgba(139,92,246,.25);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; color: var(--violet-l);
+  flex-shrink: 0;
+}
+
+.auc-info { min-width: 0; }
+.auc-name { font-size: 14px; font-weight: 600; color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.auc-handle { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.auc-meta { font-size: 11px; color: var(--muted2); margin-top: 2px; }
+
+.auc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+
+.auc-balance {
+  font-size: 14px; font-weight: 700; color: var(--green-l);
+  white-space: nowrap;
+}
+
+.auc-topup-btn {
+  background: rgba(16,185,129,.12);
+  border: 1px solid rgba(16,185,129,.2);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  color: var(--green-l);
+  cursor: pointer;
+  transition: background .2s, transform .1s;
+  white-space: nowrap;
+}
+.auc-topup-btn:active { transform: scale(.94); background: rgba(16,185,129,.25); }
+
+/* ── ADMIN SEGMENTED CONTROL ─────────── */
+.admin-seg {
+  display: flex; gap: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 14px;
+}
+
+.admin-seg-btn {
+  flex: 1; padding: 8px 0;
+  background: none; border: none;
+  border-radius: 9px;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  color: var(--muted); cursor: pointer;
+  transition: all .2s;
+}
+.admin-seg-btn.active {
+  background: rgba(139,92,246,.15);
+  color: var(--violet-l);
+}
+
+/* ── SERVERS SECTION ─────────────────── */
+.servers-plans-grid {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 14px;
+}
+
+.srv-plan-pill {
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all .2s;
+  min-width: 80px;
+}
+.srv-plan-pill.active {
+  background: rgba(139,92,246,.12);
+  border-color: rgba(139,92,246,.3);
+}
+
+.srv-plan-name {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  white-space: nowrap;
+}
+.srv-plan-pill.active .srv-plan-name { color: var(--violet-l); }
+
+.srv-plan-count {
+  font-size: 11px; color: var(--muted); margin-top: 2px;
+}
+.srv-plan-pill.active .srv-plan-count { color: var(--violet-l); opacity: .7; }
+
+.servers-keys-block {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.servers-keys-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+}
+.servers-keys-label { font-size: 13px; font-weight: 600; color: var(--white); }
+.servers-keys-hint  { font-size: 11px; color: var(--muted); }
+
+.servers-textarea {
+  width: 100%; resize: vertical;
+  background: rgba(0,0,0,.35);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px; color: var(--text); line-height: 1.7;
+  outline: none; margin-bottom: 12px;
+  transition: border-color .2s;
+}
+.servers-textarea:focus { border-color: var(--violet); }
+.servers-textarea::placeholder { color: var(--muted); font-family: inherit; }
+
+.servers-add-btn {
+  width: 100%; padding: 12px;
+  background: linear-gradient(135deg, var(--violet), #6D28D9);
+  border: none; border-radius: 12px;
+  color: white; font-family: inherit;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(139,92,246,.25);
+  transition: all .2s;
+}
+.servers-add-btn:active { transform: scale(.98); }
+.servers-add-btn:disabled { background: var(--card2); box-shadow: none; color: var(--muted); cursor: not-allowed; }
+
+.servers-existing-wrap { margin-bottom: 8px; }
+
+.servers-existing-label {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .8px;
+  margin-bottom: 8px;
+}
+
+.srv-key-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+
+.srv-key-val {
+  flex: 1; font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.srv-key-status {
+  font-size: 10px; font-weight: 600; padding: 3px 8px;
+  border-radius: var(--r-pill); flex-shrink: 0;
+}
+.srv-key-status.avail {
+  background: rgba(16,185,129,.12); color: var(--green-l);
+  border: 1px solid rgba(16,185,129,.2);
+}
+.srv-key-status.used {
+  background: rgba(113,113,122,.1); color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.srv-key-del {
+  background: rgba(239,68,68,.1);
+  border: 1px solid rgba(239,68,68,.2);
+  border-radius: 6px;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: #FCA5A5;
+  cursor: pointer; flex-shrink: 0;
+  transition: background .2s;
+}
+.srv-key-del:active { background: rgba(239,68,68,.25); }
+.srv-key-del:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── TOPUP MODAL ─────────────────────── */
+.admin-amount-wrap { margin-bottom: 18px; }
+
+.admin-amount-input {
+  width: 100%;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-family: inherit; font-size: 22px; font-weight: 700;
+  color: var(--white); text-align: center;
+  outline: none; margin-bottom: 10px;
+  transition: border-color .2s;
+}
+.admin-amount-input:focus { border-color: var(--violet); }
+.admin-amount-input::placeholder { font-size: 14px; font-weight: 400; color: var(--muted); }
+
+.admin-amount-presets {
+  display: flex; gap: 8px; justify-content: center;
+}
+
+.amount-preset {
+  flex: 1;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 0;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .2s;
+}
+.amount-preset:active, .amount-preset.active {
+  background: rgba(139,92,246,.15);
+  border-color: rgba(139,92,246,.3);
+  color: var(--violet-l);
+}

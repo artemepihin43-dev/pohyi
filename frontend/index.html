@@ -65,6 +65,13 @@
         </svg>
         <span>Рефералы</span>
       </button>
+      <button class="tab tab-admin" data-tab="admin" id="tab-btn-admin" style="display:none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Админ</span>
+      </button>
     </nav>
 
     <!-- МАГАЗИН -->
@@ -90,6 +97,13 @@
     <!-- РЕФЕРАЛЫ -->
     <section id="tab-referral" class="tab-content">
       <div id="referral-page">
+        <div class="loader"><div class="spin"></div></div>
+      </div>
+    </section>
+
+    <!-- АДМИН -->
+    <section id="tab-admin" class="tab-content">
+      <div id="admin-panel">
         <div class="loader"><div class="spin"></div></div>
       </div>
     </section>
