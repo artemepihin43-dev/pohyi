@@ -2,7 +2,7 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const API_URL = 'https://tender-panda-40.loca.lt';
+const API_URL = 'https://massive-dragon-47.loca.lt';
 
 let currentUser = null;
 
