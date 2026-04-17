@@ -498,23 +498,15 @@ app.post('/api/admin/tg/topup', adminTgAuth, (req, res) => {
 let tonRateRub = 0;
 let tonRateUpdatedAt = 0;
 
-function httpsGet(hostname, path) {
-  return new Promise((resolve, reject) => {
-    const req = require('https').request({ hostname, path, method: 'GET' }, res => {
-      let data = '';
-      res.on('data', c => data += c);
-      res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
-    });
-    req.on('error', reject);
-    req.end();
-  });
+const nodeFetch = require('node-fetch');
+function httpsGet(url) {
+  return nodeFetch(url, { timeout: 10000 }).then(r => r.json());
 }
 
 async function fetchTonRate() {
   try {
     const json = await httpsGet(
-      'api.coingecko.com',
-      '/api/v3/simple/price?ids=the-open-network&vs_currencies=rub'
+      'https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=rub'
     );
     const rate = json['the-open-network']?.rub;
     if (rate > 0) {
@@ -535,8 +527,7 @@ async function checkTonTransactions() {
 
   try {
     const json = await httpsGet(
-      'toncenter.com',
-      `/api/v2/getTransactions?address=${encodeURIComponent(walletAddress)}&limit=50&api_key=${apiKey}`
+      `https://toncenter.com/api/v2/getTransactions?address=${encodeURIComponent(walletAddress)}&limit=50&api_key=${apiKey}`
     );
     if (!json.ok || !Array.isArray(json.result)) return;
 
