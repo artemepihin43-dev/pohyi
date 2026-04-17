@@ -514,32 +514,14 @@ app.listen(PORT, async () => {
     console.log(`🤖 Бот запущен (polling)`);
   }
 
-  // Кнопка меню рядом со строкой ввода (задержка — DNS может не быть готов сразу)
-  setTimeout(() => {
+  // Кнопка меню рядом со строкой ввода — используем bot._request через его соединение
   const webAppUrl = process.env.WEB_APP_URL;
-  if (webAppUrl && process.env.BOT_TOKEN) {
-    const payload = JSON.stringify({
-      menu_button: { type: 'web_app', text: '🛒 Открыть', web_app: { url: webAppUrl } }
-    });
-    const req = require('https').request({
-      hostname: 'api.telegram.org',
-      path: `/bot${process.env.BOT_TOKEN}/setChatMenuButton`,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
-    }, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        const r = JSON.parse(data);
-        if (r.ok) console.log(`🔘 Кнопка меню установлена`);
-        else console.error('Menu button error:', r.description);
-      });
-    });
-    req.on('error', e => console.error('Menu button error:', e.message));
-    req.write(payload);
-    req.end();
+  if (webAppUrl) {
+    bot._request('setChatMenuButton', {
+      qs: { menu_button: JSON.stringify({ type: 'web_app', text: '🛒 Открыть', web_app: { url: webAppUrl } }) }
+    }).then(() => console.log('🔘 Кнопка меню установлена'))
+      .catch(e => console.error('Menu button error:', e.message));
   }
-  }, 3000); // ждём 3 сек пока поднимется сеть
 });
 
 module.exports = { REFERRAL_BONUS };
