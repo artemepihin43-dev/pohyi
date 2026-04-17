@@ -2,7 +2,7 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const API_URL = 'https://jolly-mayfly-74.loca.lt';
+const API_URL = 'https://xylivpnbot.loca.lt';
 
 // Все запросы к туннелю требуют этот заголовок — иначе localtunnel показывает HTML-заглушку
 function apiFetch(url, options = {}) {
