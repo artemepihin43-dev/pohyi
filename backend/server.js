@@ -514,7 +514,8 @@ app.listen(PORT, async () => {
     console.log(`🤖 Бот запущен (polling)`);
   }
 
-  // Кнопка меню рядом со строкой ввода
+  // Кнопка меню рядом со строкой ввода (задержка — DNS может не быть готов сразу)
+  setTimeout(() => {
   const webAppUrl = process.env.WEB_APP_URL;
   if (webAppUrl && process.env.BOT_TOKEN) {
     const payload = JSON.stringify({
@@ -538,6 +539,7 @@ app.listen(PORT, async () => {
     req.write(payload);
     req.end();
   }
+  }, 3000); // ждём 3 сек пока поднимется сеть
 });
 
 module.exports = { REFERRAL_BONUS };
