@@ -4,6 +4,12 @@ tg.expand();
 
 const API_URL = 'https://xylivpnbot.loca.lt';
 
+// Все запросы к туннелю требуют этот заголовок — иначе localtunnel показывает HTML-заглушку
+function apiFetch(url, options = {}) {
+  options.headers = { 'bypass-tunnel-reminder': 'true', ...options.headers };
+  return fetch(url, options);
+}
+
 let currentUser = null;
 
 // Показываем вкладку Админ
@@ -57,7 +63,7 @@ const checkSvg = `<svg width="10" height="10" viewBox="0 0 12 12" fill="none">
 // ─── ПРОФИЛЬ ───────────────────────────────────
 async function loadProfile() {
   try {
-    const res = await fetch(`${API_URL}/api/me`, { headers: { 'x-init-data': initData() } });
+    const res = await apiFetch(`${API_URL}/api/me`, { headers: { 'x-init-data': initData() } });
     if (!res.ok) return;
     currentUser = await res.json();
     const bal = currentUser.balance || 0;
@@ -86,7 +92,7 @@ async function openTonModal() {
   modal.classList.remove('hidden');
 
   try {
-    const res = await fetch(`${API_URL}/api/topup/ton/rate`);
+    const res = await apiFetch(`${API_URL}/api/topup/ton/rate`);
     const data = await res.json();
     tonRate = data.rate || 0;
   } catch {}
@@ -166,7 +172,7 @@ function renderTonStep1() {
     btn.disabled = true; btn.textContent = 'Создаю…';
 
     try {
-      const res = await fetch(`${API_URL}/api/topup/ton/create`, {
+      const res = await apiFetch(`${API_URL}/api/topup/ton/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-init-data': initData() },
         body: JSON.stringify({ amount_rub })
@@ -237,7 +243,7 @@ function renderTonStep2(payment) {
   // Polling каждые 5 секунд
   tonPollTimer = setInterval(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/topup/ton/status`, {
+      const res = await apiFetch(`${API_URL}/api/topup/ton/status`, {
         headers: { 'x-init-data': initData() }
       });
       const json = await res.json();
@@ -291,7 +297,7 @@ const FEATURES = [
 async function loadPlans() {
   const container = document.getElementById('plans-list');
   try {
-    const res = await fetch(`${API_URL}/api/plans`);
+    const res = await apiFetch(`${API_URL}/api/plans`);
     const plans = await res.json();
 
     if (!plans.length) {
@@ -384,7 +390,7 @@ async function createInvoice(planId) {
   if (btn) { btn.disabled = true; btn.textContent = 'Обработка...'; }
 
   try {
-    const res = await fetch(`${API_URL}/api/create-invoice`, {
+    const res = await apiFetch(`${API_URL}/api/create-invoice`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ initData: data, planId })
@@ -420,7 +426,7 @@ async function loadOrders() {
   }
 
   try {
-    const res = await fetch(`${API_URL}/api/orders`, { headers: { 'x-init-data': initData() } });
+    const res = await apiFetch(`${API_URL}/api/orders`, { headers: { 'x-init-data': initData() } });
     const orders = await res.json();
 
     if (!orders.length) {
@@ -543,7 +549,7 @@ async function loadAdminPanel() {
   }
 
   try {
-    const res = await fetch(`${API_URL}/api/admin/tg/users`, {
+    const res = await apiFetch(`${API_URL}/api/admin/tg/users`, {
       headers: { 'x-init-data': initData() }
     });
     if (!res.ok) { container.innerHTML = emptyState('⛔', 'Нет доступа', 'Только для администратора'); return; }
@@ -619,7 +625,7 @@ async function renderServersSection() {
   body.innerHTML = '<div class="loader"><div class="spin"></div></div>';
 
   try {
-    const res = await fetch(`${API_URL}/api/admin/tg/plans`, {
+    const res = await apiFetch(`${API_URL}/api/admin/tg/plans`, {
       headers: { 'x-init-data': initData() }
     });
     const plans = await res.json();
@@ -685,7 +691,7 @@ function renderServersForm(plans) {
     btn.disabled = true; btn.textContent = 'Загрузка…';
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/tg/keys`, {
+      const res = await apiFetch(`${API_URL}/api/admin/tg/keys`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-init-data': initData() },
         body: JSON.stringify({ plan_id: planId, keys })
@@ -695,7 +701,7 @@ function renderServersForm(plans) {
         showToast(`✅ Добавлено ${json.added} ключей`);
         document.getElementById('servers-textarea').value = '';
         // обновим счётчики
-        const plansRes = await fetch(`${API_URL}/api/admin/tg/plans`, { headers: { 'x-init-data': initData() } });
+        const plansRes = await apiFetch(`${API_URL}/api/admin/tg/plans`, { headers: { 'x-init-data': initData() } });
         const updatedPlans = await plansRes.json();
         // обновить пилюли
         updatedPlans.forEach(p => {
@@ -720,7 +726,7 @@ async function loadExistingKeys(planId, plans) {
   list.innerHTML = '<div class="loader" style="padding:20px 0"><div class="spin"></div></div>';
 
   try {
-    const keysRes = await fetch(`${API_URL}/api/admin/tg/keys-list?plan_id=${planId}`, {
+    const keysRes = await apiFetch(`${API_URL}/api/admin/tg/keys-list?plan_id=${planId}`, {
       headers: { 'x-init-data': initData() }
     });
     if (!keysRes.ok) { list.innerHTML = ''; return; }
@@ -746,7 +752,7 @@ async function loadExistingKeys(planId, plans) {
         delBtn.addEventListener('click', async () => {
           delBtn.disabled = true;
           try {
-            const r = await fetch(`${API_URL}/api/admin/tg/keys/${k.id}`, {
+            const r = await apiFetch(`${API_URL}/api/admin/tg/keys/${k.id}`, {
               method: 'DELETE',
               headers: { 'x-init-data': initData() }
             });
@@ -848,7 +854,7 @@ function openTopupModal(user) {
     confirmBtn.textContent = 'Отправка…';
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/tg/topup`, {
+      const res = await apiFetch(`${API_URL}/api/admin/tg/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-init-data': initData() },
         body: JSON.stringify({ telegram_id: user.telegram_id, amount })

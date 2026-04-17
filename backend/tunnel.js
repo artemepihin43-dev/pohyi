@@ -1,83 +1,91 @@
-// Автоматический туннель через localhost.run
-// Запускается через PM2, при падении перезапускается автоматически
+/**
+ * Кастомный туннель через localtunnel.me
+ * Использует node-fetch для регистрации (работает при DNS-проблемах на Windows)
+ * и net.Socket для TCP-проксирования трафика.
+ */
+const net    = require('net');
+const fs     = require('fs');
+const path   = require('path');
+const fetch  = require('node-fetch');
 
-const { spawn, execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const LOCAL_PORT  = 3000;
+const SUBDOMAIN   = 'xylivpnbot';
+const LT_HOST     = 'localtunnel.me';
+const FRONTEND    = path.join(__dirname, '..', 'frontend', 'app.js');
+const DOCS        = path.join(__dirname, '..', 'docs',     'app.js');
 
-const API_URL_FILE = path.join(__dirname, '..', 'docs', 'app.js');
-const FRONTEND_FILE = path.join(__dirname, '..', 'frontend', 'app.js');
+let activeSockets = [];
 
 function updateApiUrl(newUrl) {
-  [API_URL_FILE, FRONTEND_FILE].forEach(file => {
+  [FRONTEND, DOCS].forEach(file => {
     if (!fs.existsSync(file)) return;
-    let content = fs.readFileSync(file, 'utf8');
-    content = content.replace(
-      /const API_URL = '.*?';/,
-      `const API_URL = '${newUrl}';`
-    );
-    fs.writeFileSync(file, content, 'utf8');
+    let c = fs.readFileSync(file, 'utf8');
+    c = c.replace(/const API_URL = '.*?';/, `const API_URL = '${newUrl}';`);
+    fs.writeFileSync(file, c, 'utf8');
   });
-  console.log(`[tunnel] API_URL обновлён: ${newUrl}`);
-
-  // Пушим на GitHub Pages
+  console.log(`[tunnel] API_URL → ${newUrl}`);
   try {
+    const { execSync } = require('child_process');
     const root = path.join(__dirname, '..');
-    execSync('git add frontend/app.js', { cwd: root, stdio: 'pipe' });
+    execSync('git add frontend/app.js docs/app.js', { cwd: root, stdio: 'pipe' });
     execSync(`git commit -m "tunnel: update API_URL to ${newUrl}"`, { cwd: root, stdio: 'pipe' });
     execSync('git push origin main', { cwd: root, stdio: 'pipe' });
-    console.log(`[tunnel] GitHub Pages обновлён`);
+    console.log('[tunnel] GitHub Pages обновлён');
   } catch (e) {
-    // Если нечего коммитить — это нормально
-    if (!e.message.includes('nothing to commit')) {
-      console.error('[tunnel] Ошибка git push:', e.stderr?.toString() || e.message);
+    if (!e.stderr?.toString().includes('nothing to commit')) {
+      console.error('[tunnel] git push:', e.stderr?.toString().slice(0,120) || e.message);
     }
   }
 }
 
-function startTunnel() {
-  console.log('[tunnel] Запуск туннеля localhost.run...');
+// Открываем N постоянных TCP-соединений к серверу туннеля
+function openWorker(remoteHost, remotePort, connId) {
+  const remote = net.createConnection({ host: remoteHost, port: remotePort });
+  remote.on('connect', () => {
+    const local = net.createConnection({ host: '127.0.0.1', port: LOCAL_PORT });
+    remote.pipe(local);
+    local.pipe(remote);
+    local.on('error', () => remote.destroy());
+    remote.on('error', () => local.destroy());
+    local.on('close', () => remote.destroy());
+    remote.on('close', () => {
+      local.destroy();
+      // Открываем новое соединение взамен закрытого
+      setTimeout(() => openWorker(remoteHost, remotePort, connId), 1000);
+    });
+  });
+  remote.on('error', () => {
+    setTimeout(() => openWorker(remoteHost, remotePort, connId), 2000);
+  });
+  activeSockets.push(remote);
+}
 
-  const ssh = spawn('ssh', [
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'ServerAliveInterval=30',
-    '-o', 'ServerAliveCountMax=3',
-    '-R', '80:localhost:3000',
-    'nokey@localhost.run'
-  ], { windowsHide: true });
+async function startTunnel() {
+  console.log(`[tunnel] Регистрация subdomain "${SUBDOMAIN}"...`);
+  try {
+    const res  = await fetch(`https://${LT_HOST}/${SUBDOMAIN}`, { timeout: 10000 });
+    const info = await res.json();
+    if (!info.url || !info.port) throw new Error('Некорректный ответ: ' + JSON.stringify(info));
 
-  ssh.stdout.on('data', (data) => {
-    const text = data.toString();
-    console.log('[tunnel stdout]', text);
+    console.log(`[tunnel] ✅ ${info.url}  (remote port: ${info.port})`);
+    updateApiUrl(info.url);
 
-    // Парсим URL из строки вида: xxxxx.lhr.life tunneled with tls termination, https://xxxxx.lhr.life
-    const match = text.match(/https:\/\/([a-z0-9]+\.lhr\.life)/);
-    if (match) {
-      const url = `https://${match[1]}`;
-      console.log(`[tunnel] ✅ Туннель активен: ${url}`);
-      updateApiUrl(url);
+    // Закрываем старые соединения
+    activeSockets.forEach(s => s.destroy());
+    activeSockets = [];
+
+    const maxConn = info.max_conn_count || 10;
+    for (let i = 0; i < maxConn; i++) {
+      openWorker(LT_HOST, info.port, i);
     }
-  });
 
-  ssh.stderr.on('data', (data) => {
-    const text = data.toString();
-    // Ищем URL в stderr тоже
-    const match = text.match(/https:\/\/([a-z0-9]+\.lhr\.life)/);
-    if (match) {
-      const url = `https://${match[1]}`;
-      console.log(`[tunnel] ✅ Туннель активен: ${url}`);
-      updateApiUrl(url);
-    }
-  });
+    // Перерегистрируемся каждые 90 минут (на случай истечения сессии)
+    setTimeout(startTunnel, 90 * 60 * 1000);
 
-  ssh.on('close', (code) => {
-    console.log(`[tunnel] Соединение закрыто (код ${code}). Перезапуск через 5 сек...`);
-    setTimeout(startTunnel, 5000);
-  });
-
-  ssh.on('error', (err) => {
-    console.error('[tunnel] Ошибка:', err.message);
-  });
+  } catch (e) {
+    console.error('[tunnel] Ошибка:', e.message, '— retry через 10 сек');
+    setTimeout(startTunnel, 10000);
+  }
 }
 
 startTunnel();
