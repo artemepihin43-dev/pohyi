@@ -2,7 +2,7 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const API_URL = 'https://blue-yak-72.loca.lt';
+const API_URL = 'https://xylivpnbot.loca.lt';
 
 let currentUser = null;
 
