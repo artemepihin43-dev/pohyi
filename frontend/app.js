@@ -866,7 +866,7 @@ function openTopupModal(user) {
         // обновляем локальный список
         const idx = adminUsers.findIndex(u => u.telegram_id === user.telegram_id);
         if (idx !== -1) adminUsers[idx].balance = json.new_balance;
-        renderAdminPanel(adminUsers);
+        renderUserCards(adminUsers);
         // восстановить поиск если был
         const q = document.getElementById('admin-search')?.value.trim().toLowerCase();
         if (q) {
