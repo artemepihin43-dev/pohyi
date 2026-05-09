@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CrashGame 🚀</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<!-- Header -->
+<header class="header">
+  <div class="logo">🚀 CrashGame</div>
+  <div class="header-right">
+    <div class="balance-display">
+      <span class="balance-icon">💰</span>
+      <span id="balance-amount">0</span>
+    </div>
+    <button class="btn-icon" id="btn-leaderboard" onclick="openTab('leaderboard')">🏆</button>
+  </div>
+</header>
+
+<!-- Tabs -->
+<nav class="tabs">
+  <button class="tab active" data-tab="game" onclick="openTab('game')">Игра</button>
+  <button class="tab" data-tab="history" onclick="openTab('history')">История</button>
+  <button class="tab" data-tab="leaderboard" onclick="openTab('leaderboard')">Топ</button>
+  <button class="tab" data-tab="profile" onclick="openTab('profile')">Профиль</button>
+</nav>
+
+<!-- ════════ GAME TAB ════════ -->
+<div id="tab-game" class="tab-content active">
+
+  <!-- History chips -->
+  <div class="history-strip" id="history-strip">
+    <!-- filled by JS -->
+  </div>
+
+  <!-- Crash canvas area -->
+  <div class="game-area">
+    <canvas id="crashCanvas"></canvas>
+    <div class="multiplier-overlay" id="multiplier-overlay">
+      <div class="multiplier-value" id="multiplier-value">1.00x</div>
+      <div class="multiplier-label" id="multiplier-label">Жди ставок...</div>
+    </div>
+    <div class="countdown-overlay" id="countdown-overlay" style="display:none">
+      <div class="countdown-text">Старт через</div>
+      <div class="countdown-value" id="countdown-value">6</div>
+    </div>
+  </div>
+
+  <!-- Bet panel -->
+  <div class="bet-panel">
+    <div class="bet-row">
+      <div class="input-group">
+        <label>Ставка</label>
+        <div class="input-wrap">
+          <input type="number" id="bet-amount" value="100" min="10" max="10000" step="10">
+          <div class="quick-bets">
+            <button onclick="setQuickBet(50)">50</button>
+            <button onclick="setQuickBet(100)">100</button>
+            <button onclick="setQuickBet(500)">500</button>
+            <button onclick="halveBet()">½</button>
+            <button onclick="doubleBet()">2x</button>
+          </div>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>
+          <input type="checkbox" id="auto-cashout-check" onchange="toggleAutoCashout()">
+          Авто вывод
+        </label>
+        <div class="input-wrap">
+          <input type="number" id="auto-cashout-value" value="2.00" min="1.01" max="1000" step="0.01" disabled>
+        </div>
+      </div>
+    </div>
+
+    <div class="bet-actions">
+      <button class="btn-bet" id="btn-bet" onclick="handleBetButton()">
+        <span id="btn-bet-text">Поставить</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Active bets table -->
+  <div class="bets-section">
+    <h3>Активные ставки <span id="bets-count" class="badge">0</span></h3>
+    <div class="bets-table-wrap">
+      <table class="bets-table">
+        <thead>
+          <tr>
+            <th>Игрок</th>
+            <th>Ставка</th>
+            <th>Вывод</th>
+            <th>Профит</th>
+          </tr>
+        </thead>
+        <tbody id="bets-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ HISTORY TAB ════════ -->
+<div id="tab-history" class="tab-content">
+  <div class="section-title">История раундов</div>
+  <div id="history-list" class="history-list"></div>
+</div>
+
+<!-- ════════ LEADERBOARD TAB ════════ -->
+<div id="tab-leaderboard" class="tab-content">
+  <div class="section-title">🏆 Таблица лидеров</div>
+  <div id="leaderboard-list" class="leaderboard-list"></div>
+</div>
+
+<!-- ════════ PROFILE TAB ════════ -->
+<div id="tab-profile" class="tab-content">
+  <div class="profile-card">
+    <div class="profile-avatar" id="profile-avatar">?</div>
+    <div class="profile-name" id="profile-name">Загрузка...</div>
+    <div class="profile-username" id="profile-username"></div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-balance">0</div>
+      <div class="stat-label">Баланс</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-value" id="stat-won">0</div>
+      <div class="stat-label">Выиграно</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-value" id="stat-lost">0</div>
+      <div class="stat-label">Проиграно</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-games">0</div>
+      <div class="stat-label">Игр</div>
+    </div>
+  </div>
+  <div class="provably-fair">
+    <h4>🔐 Честная игра (Provably Fair)</h4>
+    <p>Каждый раунд имеет уникальный хэш, который можно проверить после игры. Хэш генерируется до начала раунда.</p>
+    <div class="hash-display">
+      <label>Хэш текущего раунда:</label>
+      <div id="current-hash" class="hash-value">Ожидание...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
