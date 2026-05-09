@@ -16,12 +16,17 @@ const _params = new URLSearchParams(window.location.search);
 const BASE = (_params.get('api') || '').replace(/\/$/, '');
 const WS_URL = BASE.replace(/^http/, 'ws');
 
-// Bypass localtunnel reminder header
 const EXTRA_HEADERS = { 'bypass-tunnel-reminder': 'true' };
 
 if (!BASE) {
-  document.body.innerHTML = '<div style="color:#ff4757;padding:40px;text-align:center;font-size:18px">❌ Ошибка: не указан API URL.<br>Открой через бота.</div>';
+  document.body.innerHTML = `<div style="color:#ff4757;padding:40px;text-align:center;font-size:18px">${ic('close','32px','#ff4757')}<br>Ошибка: не указан API URL.<br>Открой через бота.</div>`;
   throw new Error('No API URL');
+}
+
+// ─── SVG icon helper ─────────────────────────────────────────
+// Returns inline <svg><use> string. Use in innerHTML (not textContent).
+function ic(name, size = '18px', color = 'currentColor') {
+  return `<svg width="${size}" height="${size}" style="display:inline-block;vertical-align:middle;color:${color}" aria-hidden="true"><use href="#ic-${name}"/></svg>`;
 }
 
 // ─── State ───────────────────────────────────────────────────
@@ -88,7 +93,23 @@ function drawCanvas() {
   ctx.arc(tipX, tipY, 5, 0, Math.PI * 2);
   ctx.fillStyle = isRed ? '#ff4757' : '#00c896';
   ctx.fill();
-  if (gameState === 'RUNNING') { ctx.font = '18px serif'; ctx.fillText('🚀', tipX - 9, tipY - 8); }
+  if (gameState === 'RUNNING') {
+    // draw small rocket marker on canvas tip
+    ctx.save();
+    ctx.translate(tipX, tipY - 12);
+    // body
+    ctx.beginPath();
+    ctx.moveTo(0, -7); ctx.bezierCurveTo(-4, -2, -4, 3, -4, 6);
+    ctx.lineTo(4, 6); ctx.bezierCurveTo(4, 3, 4, -2, 0, -7);
+    ctx.fillStyle = '#a78bfa'; ctx.fill();
+    // window
+    ctx.beginPath(); ctx.arc(0, 0, 1.6, 0, Math.PI*2);
+    ctx.fillStyle = '#fff'; ctx.fill();
+    // flame
+    ctx.beginPath(); ctx.moveTo(-2, 6); ctx.quadraticCurveTo(0, 12, 2, 6);
+    ctx.fillStyle = '#ff7400'; ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawGrid(W, H) {
@@ -163,13 +184,13 @@ function handleMessage(msg) {
     case 'CRASHED':
       gameState = 'CRASHED'; crashedAt = msg.crashPoint; points.push(msg.crashPoint);
       setCrashedUI(msg.crashPoint); updateBetsTable(msg.bets || []); drawCanvas();
-      if (myBet && !myBet.cashedOut) { showToast(`💥 Краш ${msg.crashPoint}x — ставка сгорела`, 'red'); myBet = null; updateBetButton(); }
+      if (myBet && !myBet.cashedOut) { showToast(`Краш ${msg.crashPoint}x — ставка сгорела`, 'red', 'explosion'); myBet = null; updateBetButton(); }
       break;
     case 'BET_PLACED': case 'BET_CANCELLED': updateBetsTable(msg.bets || []); break;
     case 'CASHOUT':
       updateBetsTable(msg.bets || []);
       if (String(msg.userId) === MY_ID) {
-        showToast(`✅ Выведено ${msg.winAmount} × ${msg.multiplier}x`, 'green');
+        showToast(`Выведено ${msg.winAmount} × ${msg.multiplier}x`, 'green', 'check');
         myBet = { ...myBet, cashedOut: true }; updateBetButton(); refreshBalance();
       }
       break;
@@ -179,7 +200,8 @@ function handleMessage(msg) {
 // ─── UI ───────────────────────────────────────────────────────
 function setWaitingUI(timeLeftMs) {
   const m = document.getElementById('multiplier-value');
-  m.textContent = '🕐'; m.className = 'multiplier-value waiting';
+  m.innerHTML = ic('clock', '52px', 'var(--text2)');
+  m.className = 'multiplier-value waiting';
   m.style.color = ''; m.style.textShadow = '';
   document.getElementById('multiplier-label').textContent = 'Принимаем ставки...';
   if (timeLeftMs) { countdownEnd = Date.now() + timeLeftMs; startCountdown(); }
@@ -187,7 +209,9 @@ function setWaitingUI(timeLeftMs) {
 }
 
 function setRunningUI() {
-  document.getElementById('multiplier-value').className = 'multiplier-value';
+  const m = document.getElementById('multiplier-value');
+  m.className = 'multiplier-value';
+  // will be filled by updateMultiplierDisplay()
   document.getElementById('multiplier-label').textContent = 'В ПОЛЁТЕ';
   document.getElementById('countdown-overlay').style.display = 'none';
   updateBetButton(); updateMultiplierDisplay();
@@ -197,7 +221,8 @@ function setCrashedUI(cp) {
   const m = document.getElementById('multiplier-value');
   m.textContent = `${cp}x`; m.className = 'multiplier-value crashed';
   m.style.color = ''; m.style.textShadow = '';
-  document.getElementById('multiplier-label').textContent = '💥 КРАШ!';
+  const lbl = document.getElementById('multiplier-label');
+  lbl.innerHTML = `${ic('explosion','16px','#ff4757')} КРАШ!`;
   document.getElementById('countdown-overlay').style.display = 'none';
   updateBetButton();
 }
@@ -239,21 +264,33 @@ function updateBetsTable(bets) {
     const co = b.cashedOut ? `${b.cashoutMultiplier.toFixed(2)}x` : '—';
     const pr = b.cashedOut ? `+${b.profit}` : '—';
     const name = b.username ? `@${b.username}` : b.firstName;
-    return `<tr class="${cls}"><td>${name}${String(b.userId)===MY_ID?' ★':''}</td><td>${b.amount}</td><td>${co}</td><td>${pr}</td></tr>`;
+    return `<tr class="${cls}"><td>${name}${String(b.userId)===MY_ID?(' '+ic('star','14px','var(--yellow)')):''}</td><td>${b.amount}</td><td>${co}</td><td>${pr}</td></tr>`;
   }).join('');
 }
 
 function updateBetButton() {
   const btn = document.getElementById('btn-bet');
   const txt = document.getElementById('btn-bet-text');
+  const iconUse = document.getElementById('btn-bet-icon-use');
   btn.className = 'btn-bet';
+
   if (gameState === 'WAITING') {
-    if (myBet) { txt.textContent = '❌ Отменить ставку'; btn.classList.add('cancel'); }
-    else txt.textContent = '🎯 Поставить';
+    if (myBet) {
+      iconUse.setAttribute('href', '#ic-close');
+      txt.textContent = 'Отменить ставку';
+      btn.classList.add('cancel');
+    } else {
+      iconUse.setAttribute('href', '#ic-target');
+      txt.textContent = 'Поставить';
+    }
   } else if (gameState === 'RUNNING' && myBet && !myBet.cashedOut) {
-    txt.textContent = `💸 Вывести (${currentMultiplier.toFixed(2)}x)`; btn.classList.add('cashout');
+    iconUse.setAttribute('href', '#ic-cashout');
+    txt.textContent = `Вывести (${currentMultiplier.toFixed(2)}x)`;
+    btn.classList.add('cashout');
   } else {
-    txt.textContent = '⏳ Ждите следующего раунда'; btn.classList.add('disabled');
+    iconUse.setAttribute('href', '#ic-hourglass');
+    txt.textContent = 'Ждите следующего раунда';
+    btn.classList.add('disabled');
   }
 }
 
@@ -269,8 +306,8 @@ async function placeBet() {
   if (!amount || amount <= 0) { showToast('Введите сумму ставки', 'red'); return; }
   try {
     const res = await apiPost('/api/bet', { userId: MY_ID, amount, autoCashout, username: MY_USERNAME, firstName: MY_NAME });
-    if (res.success) { myBet = { amount, autoCashout, cashedOut: false }; balance = res.balance; updateBalanceDisplay(); updateBetButton(); showToast(`✅ Ставка ${amount} принята`, 'green'); }
-    else showToast(res.error || 'Ошибка', 'red');
+    if (res.success) { myBet = { amount, autoCashout, cashedOut: false }; balance = res.balance; updateBalanceDisplay(); updateBetButton(); showToast(`Ставка ${amount} принята`, 'green', 'check'); }
+    else showToast(res.error || 'Ошибка', 'red', 'close');
   } catch(e) { showToast('Ошибка сети', 'red'); }
 }
 
@@ -315,11 +352,15 @@ async function loadLeaderboard() {
   try {
     const leaders = await apiFetch('/api/leaderboard');
     const el = document.getElementById('leaderboard-list');
-    const medals = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
     if (!leaders.length) { el.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px">Нет данных</div>'; return; }
     el.innerHTML = leaders.map((u,i) => {
       const name = u.username ? `@${u.username}` : u.firstName;
-      return `<div class="leader-item"><div class="leader-rank">${medals[i]||i+1}</div><div class="leader-info"><div class="leader-name">${name}</div><div class="leader-games">${u.gamesPlayed} игр</div></div><div class="leader-won">${u.totalWon} 💰</div></div>`;
+      let rankHtml;
+      if (i === 0) rankHtml = ic('medal1','24px','#ffd700');
+      else if (i === 1) rankHtml = ic('medal2','24px','#c0c0c0');
+      else if (i === 2) rankHtml = ic('medal3','24px','#cd7f32');
+      else rankHtml = `<span style="font-size:13px;color:var(--text2);font-weight:700">${i+1}</span>`;
+      return `<div class="leader-item"><div class="leader-rank">${rankHtml}</div><div class="leader-info"><div class="leader-name">${name}</div><div class="leader-games">${u.gamesPlayed} игр</div></div><div class="leader-won">${u.totalWon} ${ic('coin','16px','var(--yellow)')}</div></div>`;
     }).join('');
   } catch(e) {}
 }
@@ -356,9 +397,11 @@ async function apiFetch(path) {
 }
 
 let toastTimer = null;
-function showToast(msg, type='') {
+function showToast(msg, type='', iconName='') {
   const el = document.getElementById('toast');
-  el.textContent = msg; el.className = `toast show ${type}`;
+  const iconColor = type === 'red' ? '#ff4757' : type === 'green' ? '#00c896' : 'currentColor';
+  el.innerHTML = iconName ? `${ic(iconName,'16px',iconColor)} ${msg}` : msg;
+  el.className = `toast show ${type}`;
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = 'toast'; }, 2500);
 }
